@@ -14,7 +14,25 @@ Hoy nadie los escucha; después se mandarán por WebSocket a la escena.
 """
 
 import importlib
+import os
 import pkgutil
+from pathlib import Path
+
+
+def cargar_env():
+    """Lee claves del archivo .env de la raíz del proyecto (ignorado por git).
+    Una variable de entorno ya definida tiene prioridad sobre el archivo."""
+    ruta = Path(__file__).parent.parent / ".env"
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if linea and not linea.startswith("#") and "=" in linea:
+            clave, valor = linea.split("=", 1)
+            os.environ.setdefault(clave.strip(), valor.strip().strip('"\''))
+
+
+cargar_env()
 
 
 def cargar_agentes() -> dict:

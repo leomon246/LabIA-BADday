@@ -1,6 +1,6 @@
 """Presentador: texto -> Gemini -> presentación HTML (sin Markdown ni LaTeX).
 
-Necesita la variable de entorno GEMINI_API_KEY (gratis en https://aistudio.google.com/apikey).
+Necesita GEMINI_API_KEY (gratis en https://aistudio.google.com/apikey), en el entorno o en el .env de la raíz.
 """
 
 import html
@@ -10,14 +10,15 @@ import unicodedata
 from pathlib import Path
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 from pydantic import BaseModel, Field
 
 NOMBRE = "presentador"
 DESCRIPCION = "Convierte un tema o texto en una presentación HTML con Gemini"
 
-# Cambia aquí (o con la variable GEMINI_MODELO) si en AI Studio ves un Flash más nuevo.
-MODELO = os.environ.get("GEMINI_MODELO", "gemini-3.5-flash")
+# Se prueban en orden: si uno está saturado (503), pasa al siguiente.
+# Cambia aquí (o pon GEMINI_MODELO en .env) si en AI Studio ves un Flash más nuevo.
+MODELOS = [os.environ.get("GEMINI_MODELO", "gemini-3.8-flash"), "gemini-3.5-flash", "gemini-flash-latest"]
 AQUI = Path(__file__).parent
 SALIDAS = AQUI.parent.parent / "salidas" / NOMBRE
 
@@ -54,16 +55,21 @@ Reglas de formato:
 # ---------- 2. Llamada a Gemini ----------
 
 def pedir_contenido(tema: str) -> Presentacion:
-    cliente = genai.Client()  # lee GEMINI_API_KEY del entorno
-    respuesta = cliente.models.generate_content(
-        model=MODELO,
-        contents=INSTRUCCIONES.format(tema=tema),
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=Presentacion,
-        ),
-    )
-    return respuesta.parsed
+    cliente = genai.Client()  # lee GEMINI_API_KEY del entorno (o del .env)
+    for i, modelo in enumerate(MODELOS):
+        try:
+            respuesta = cliente.models.generate_content(
+                model=modelo,
+                contents=INSTRUCCIONES.format(tema=tema),
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=Presentacion,
+                ),
+            )
+            return respuesta.parsed
+        except errors.ServerError:
+            if i == len(MODELOS) - 1:
+                raise
 
 
 # ---------- 3. HTML (la plantilla está en plantilla.html) ----------

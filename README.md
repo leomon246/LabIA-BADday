@@ -45,4 +45,4 @@ py -m venv .venv
 .venv\Scripts\python -m agentes presentador "tema"    # genera salidas/presentador/<tema>.html
 ```
 El presentador usa Gemini gratis: saca una clave en https://aistudio.google.com/apikey y
-defínela como variable de entorno `GEMINI_API_KEY`.
+ponla en un archivo `.env` en la raíz (`GEMINI_API_KEY=...`). Ese archivo está en `.gitignore`.
