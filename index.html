@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Oficina de agentes VR</title>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./estilo.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <h1>Oficina de agentes</h1>
+    <p>Caminar: WASD + mouse, Shift corre, T lanza la tarea, Esc sale. En VR: stick izquierdo camina, derecho gira, gatillo lanza la tarea.</p>
+    <div class="row">
+      <button class="primary" id="go">Lanzar tarea de prueba</button>
+      <button id="caminar">Caminar</button>
+      <button id="reset">Reiniciar</button>
+    </div>
+    <ol id="log"><li>Arrastra para girar la vista, rueda para acercar.</li></ol>
+  </div>
+  <div id="vrslot"></div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

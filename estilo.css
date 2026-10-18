@@ -1,0 +1,16 @@
+:root{--bg:#DDE3E0;--ink:#1F2A2E;--muted:#4C5B5E;--panel:rgba(250,252,251,.9);--line:#A9B6B2;--accent:#2F8F83;--accent-ink:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#1C2326;--ink:#E4EBE9;--muted:#A7B5B3;--panel:rgba(28,35,38,.9);--line:#44534F;--accent:#5FC2B4;--accent-ink:#0F2422}}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Familjen Grotesk",system-ui,sans-serif;overflow:hidden}
+#app{position:relative;height:100%}
+#app canvas{display:block;width:100%;height:100%}
+#hud{position:absolute;top:14px;left:14px;width:min(340px,calc(100% - 28px));background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+#hud h1{font-size:18px;font-weight:600;margin:0 0 4px}
+#hud p{font-size:14px;line-height:1.45;color:var(--muted);margin:0 0 12px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-size:14px;border-radius:8px;padding:8px 12px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+#log{margin:12px 0 0;padding:10px 0 0;border-top:1px solid var(--line);list-style:none;font-size:13px;line-height:1.5;max-height:150px;overflow:hidden}
+#log li{color:var(--muted)}#log li:first-child{color:var(--ink)}
+#vrslot{position:absolute;bottom:14px;left:50%;transform:translateX(-50%)}
