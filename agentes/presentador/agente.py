@@ -39,7 +39,11 @@ class Presentacion(BaseModel):
 
 
 INSTRUCCIONES = """Eres un profesor que arma exposiciones claras en espanol.
-Tema: {tema}
+Tema o material de partida:
+{tema}
+
+Si el material incluye una investigacion del equipo, basate en ella: usa sus datos y su orden,
+no inventes cifras que no esten ahi y no presentes como seguro lo que venga en "Advertencias".
 
 Arma entre 8 y 12 diapositivas que cuenten la historia completa, en orden logico:
 contexto u origen -> idea central -> desarrollo paso a paso -> ejemplo -> cierre.

@@ -7,7 +7,6 @@ import { VISITANTE, construirSala, animarSala, crearEscritorio, crearPizarra, pa
          pizarra, hayDiapositivas, cambiarDiapositiva } from './oficina.js';
 import { agentes, crearAgente, actualizarAgentes, asustar, tocaAgente } from './agentes.js';
 import { crearBus, guionDemo } from './eventos.js';
-import { crearPresentacion } from './red.js';
 import { crearJugador } from './jugador.js';
 import { crearLatigo } from './latigo.js';
 
@@ -103,6 +102,10 @@ if (EQUIPO_DEMO) {
 }
 crearAgente(scene, 'jefe', 'Jefe', 0x2F8F83, new THREE.Vector3(-2.6, 0, -4.6), 0);
 crearAgente(scene, 'presentador', 'Presentador', 0xD9663B, new THREE.Vector3(2.6, 0, -4.6), 0);   // junto al monitor grande
+// Investigador: su mesa al fondo a la izquierda (lejos del puesto de 'inv' de la demo). Investiga y le lleva las notas al presentador.
+const MESA_INVESTIGADOR = { x: -5.2, z: -3.4 };
+const dInvestigador = crearEscritorio(scene, 'investigador', MESA_INVESTIGADOR.x, MESA_INVESTIGADOR.z);
+crearAgente(scene, 'investigador', 'Investigador', 0x3A6EA5, dInvestigador.puesto, dInvestigador.yaw);
 
 // --- el jugador (tú) ---
 const jugador = crearJugador({
@@ -111,6 +114,7 @@ const jugador = crearJugador({
   poseOrbita: new THREE.Vector3(0, 3.4, 3.2),
   obstaculos: [                                   // círculos en el piso que no se pueden atravesar
     ...(EQUIPO_DEMO ? [{ x: -4, z: -1.0, r: 1.05 }, { x: 0, z: -2.4, r: 1.05 }, { x: 4, z: -1.0, r: 1.05 }] : []),   // escritorios
+    { ...MESA_INVESTIGADOR, r: 1.05 },   // mesa del investigador
     { x: -7.2, z: -5.2, r: 0.5 }, { x: 7.2, z: -5.2, r: 0.5 }, { x: -7.2, z: 3.5, r: 0.5 }, { x: 7.2, z: 3.5, r: 0.5 },  // tanques y racks
   ],
 });
@@ -142,43 +146,32 @@ addEventListener('keydown', e => {
 
 // --- servidor de agentes (agentes/servidor.py) ---
 // Sus eventos llegan en vivo y entran por el mismo bus que la demo. Sin servidor, la escena funciona igual.
-const temaEl = document.getElementById('tema'), crearBtn = document.getElementById('crear'), servEl = document.getElementById('servidor');
+// Un solo campo: el usuario pregunta y el equipo (jefe -> investigador -> presentador) responde con diapositivas.
+const formEl = document.getElementById('pregunta'), temaEl = document.getElementById('tema'),
+      preguntarBtn = document.getElementById('preguntar'), servEl = document.getElementById('servidor');
 let cola = Promise.resolve();   // los eventos se aplican en orden, uno tras otro
 const fuente = new EventSource('/api/eventos');
 fuente.onopen = async () => {
   const lista = await fetch('/api/agentes').then(r => r.json()).catch(() => []);
-  const listo = lista.some(a => a.nombre === 'presentador');
-  servEl.textContent = listo ? 'Conectado al servidor de agentes'
-                             : 'El servidor no tiene el presentador: arráncalo con .venv\\Scripts\\python -m agentes.servidor';
-  crearBtn.disabled = !listo;
+  const faltan = ['investigador', 'presentador'].filter(n => !lista.some(a => a.nombre === n));
+  servEl.textContent = !faltan.length ? 'Conectado al equipo de agentes'
+    : `Al servidor le faltan: ${faltan.join(', ')}. Arráncalo con .venv\\Scripts\\python -m agentes.servidor`;
+  preguntarBtn.disabled = faltan.length > 0;
 };
 fuente.onmessage = m => { const e = JSON.parse(m.data); cola = cola.then(() => bus.emitir(e)).catch(console.error); };
-fuente.onerror = () => { servEl.textContent = 'Sin servidor de agentes: corre .venv\\Scripts\\python -m agentes.servidor'; crearBtn.disabled = true; };
+fuente.onerror = () => { servEl.textContent = 'Sin servidor de agentes: corre .venv\\Scripts\\python -m agentes.servidor'; preguntarBtn.disabled = true; };
 
-async function pedirPresentacion() {
-  const entrada = temaEl.value.trim();
-  if (!entrada) return temaEl.focus();
-  crearBtn.disabled = true;
+formEl.addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const tema = temaEl.value.trim();
+  if (!tema) return temaEl.focus();
+  preguntarBtn.disabled = true;
   try {
-    const r = await fetch('/api/ejecutar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                             body: JSON.stringify({ agente: 'presentador', entrada }) });
+    const r = await fetch('/api/preguntar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ tema }) });
     if (!r.ok) log('Servidor', (await r.json()).error);
   } catch { log('Servidor', 'no responde'); }
-  crearBtn.disabled = false;
-}
-crearBtn.addEventListener('click', pedirPresentacion);
-temaEl.addEventListener('keydown', e => { if (e.key === 'Enter') pedirPresentacion(); });
-
-// Idea del usuario -> backend de guiones (backend/servidor.py, puerto 8001) -> eventos reales al bus
-const ideaForm = document.getElementById('ideaForm'), ideaIn = document.getElementById('idea'), crearGuion = document.getElementById('crearGuion');
-ideaForm.addEventListener('submit', async ev => {
-  ev.preventDefault();
-  const idea = ideaIn.value.trim();
-  if (!idea || corriendo) return;
-  corriendo = true; crearGuion.disabled = btn.disabled = true;
-  try { const guion = await crearPresentacion(bus, idea); log('Sistema', `Guion listo: ${guion.titulo}`); }
-  catch (err) { log('Error', err.message); }
-  finally { corriendo = false; crearGuion.disabled = btn.disabled = false; }
+  preguntarBtn.disabled = false;
 });
 document.getElementById('reset').addEventListener('click', () => location.reload());
 

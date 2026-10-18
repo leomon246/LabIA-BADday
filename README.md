@@ -50,9 +50,11 @@ Para verlo en el laboratorio VR, en vez de `python -m http.server` corre (no los
 ```
 .venv\Scripts\python -m agentes.servidor
 ```
-Abre http://localhost:8000, escribe un tema en el panel (campo "Presentador") y pulsa Crear.
+Abre http://localhost:8000, escribe qué quieres aprender y pulsa Preguntar: el Jefe se lo pasa al
+Investigador, que investiga (con el código de `backend/`) y le lleva sus notas al Presentador.
 Las diapositivas aparecen en el monitor grande del fondo: flechas ← → en la compu; en VR,
 gatillo apuntando al monitor (tercio izquierdo = atrás).
 
 El presentador usa Gemini gratis: saca una clave en https://aistudio.google.com/apikey y
-ponla en un archivo `.env` en la raíz (`GEMINI_API_KEY=...`). Ese archivo está en `.gitignore`.
+ponla en un archivo `.env` en la raíz (`GEMINI_API_KEY=...` para el Presentador; para el Investigador,
+`GEMINI_API_KEY_GUION=...` y `GEMINI_MODEL=...`, o usa la misma clave). Ese archivo está en `.gitignore`.

@@ -205,7 +205,7 @@ export function crearPizarra(scene) {
 }
 const ESTADOS = { pendiente: ['#6F7C80', 'Pendiente'], curso: ['#D9A93B', 'En curso'], revision: ['#9A5F8D', 'En revisión'], rechazado: ['#C4523E', 'Corrigiendo'], hecho: ['#3E9E5A', 'Hecho'] };
 export function dibujarPizarra(titulo, tareas) {
-  presentacion = null;
+  if (presentacion) return;   // hay diapositivas en pantalla: la lista de tareas no las tapa
   const x = P.ctx; x.fillStyle = '#0F1B20'; x.fillRect(0, 0, 1024, 560);
   x.fillStyle = '#E6F4F2'; x.font = `600 46px ${FONT}`; x.fillText(titulo, 48, 82);
   x.fillStyle = '#2C4A50'; x.fillRect(48, 108, 928, 3);

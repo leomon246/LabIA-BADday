@@ -4,7 +4,8 @@
 
 Reemplaza a `python -m http.server 8000`: sirve los mismos archivos y además:
     GET  /api/agentes   lista de agentes disponibles
-    POST /api/ejecutar  {"agente": "presentador", "entrada": "tema"}  corre el agente en segundo plano
+    POST /api/preguntar {"tema": "..."}   el flujo completo: jefe -> investigador -> presentador
+    POST /api/ejecutar  {"agente": "presentador", "entrada": "tema"}  corre un solo agente en segundo plano
     GET  /api/eventos   flujo en vivo (Server-Sent Events) con los eventos de los agentes;
                         el navegador los pasa tal cual a bus.emitir()
 Solo usa la librería estándar de Python.
@@ -49,6 +50,32 @@ def correr_agente(nombre: str, entrada: str):
         difundir({"tipo": "estado", "agente": nombre, "texto": aviso, "animo": "alert"})
     finally:
         ocupados.discard(nombre)
+
+
+def investigar_y_presentar(tema: str):
+    """El usuario pregunta; el jefe se lo encarga al investigador, que investiga y le lleva
+    sus notas al presentador, que arma las diapositivas. Si la investigación falla,
+    el presentador trabaja solo con el tema."""
+    try:
+        difundir({"tipo": "estado", "agente": "jefe", "texto": f"Pregunta: {tema[:40]}", "animo": "work"})
+        difundir({"tipo": "entrega", "agente": "jefe", "a": "investigador", "item": "Pregunta"})
+        difundir({"tipo": "estado", "agente": "jefe", "texto": "Esperando al equipo", "animo": "idle"})
+        material = tema
+        try:
+            notas = AGENTES["investigador"].ejecutar(tema, emitir=difundir)
+            difundir({"tipo": "entrega", "agente": "investigador", "a": "presentador", "item": "Investigación"})
+            material = f"Tema: {tema}\n\nInvestigación del equipo:\n{notas}"
+        except Exception as err:
+            print(f"[investigador] falló: {err}")
+            difundir({"tipo": "estado", "agente": "investigador", "texto": "No pude investigar", "animo": "alert"})
+        AGENTES["presentador"].ejecutar(material, emitir=difundir)
+        difundir({"tipo": "estado", "agente": "jefe", "texto": "Presentación lista", "animo": "ok"})
+    except Exception as err:
+        print(f"[flujo] falló: {err}")
+        aviso = "Gemini saturado, intenta otra vez" if "503" in str(err) or "429" in str(err) else "Falló, mira la terminal"
+        difundir({"tipo": "estado", "agente": "presentador", "texto": aviso, "animo": "alert"})
+    finally:
+        ocupados.discard("flujo")
 
 
 class Manejador(SimpleHTTPRequestHandler):
@@ -101,6 +128,8 @@ class Manejador(SimpleHTTPRequestHandler):
         self.wfile.write(cuerpo)
 
     def do_POST(self):
+        if self.path == "/api/preguntar":
+            return self.preguntar()
         if self.path != "/api/ejecutar":
             return self.send_error(404)
         try:
@@ -116,6 +145,23 @@ class Manejador(SimpleHTTPRequestHandler):
             return self.responder_json(409, {"error": f"{nombre} ya está trabajando"})
         ocupados.add(nombre)
         threading.Thread(target=correr_agente, args=(nombre, entrada), daemon=True).start()
+        self.responder_json(202, {"ok": True})
+
+    def preguntar(self):
+        try:
+            datos = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+            tema = str(datos["tema"]).strip()[:500]
+        except (ValueError, KeyError):
+            return self.responder_json(400, {"error": "Se espera {tema}"})
+        faltan = {"investigador", "presentador"} - set(AGENTES)
+        if faltan:
+            return self.responder_json(400, {"error": f"Faltan agentes: {', '.join(faltan)} (¿arrancaste con .venv\\Scripts\\python?)"})
+        if not tema:
+            return self.responder_json(400, {"error": "Escribe un tema"})
+        if "flujo" in ocupados:
+            return self.responder_json(409, {"error": "El equipo ya está trabajando en otra pregunta"})
+        ocupados.add("flujo")
+        threading.Thread(target=investigar_y_presentar, args=(tema,), daemon=True).start()
         self.responder_json(202, {"ok": True})
 
     def flujo_eventos(self):
