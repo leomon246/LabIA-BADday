@@ -47,5 +47,6 @@ IDs de agentes: `inv`, `red`, `rev`, `jefe`, `presentador` (el id de la escena =
 ## Ideas pendientes
 - Que los agentes volteen a ver al jugador cuando se acerca, y poder hablarles.
 - Ver el razonamiento de un agente flotando sobre él al acercarse.
+- **Unificar los dos backends**: `agentes/` (presentador, puerto 8000, eventos en vivo, campo «Presentador») y `backend/` (guion con contratos y pruebas, puerto 8001, sondeo desde `src/red.js`, formulario «Crear presentación», usa al Redactor que hoy está apagado por `EQUIPO_DEMO`).
 - Conectar más agentes reales (investigador, redactor, revisor) al servidor.
 - Escribir el tema dentro de la VR (teclado virtual o voz); hoy se escribe en el panel HTML.

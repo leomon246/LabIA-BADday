@@ -22,6 +22,7 @@ Responde siempre en español.
 - `src/oficina.js`: el laboratorio (baldosas, paredes de paneles, tanques, racks, repisas con frascos), mesas de laboratorio con pantallas, pizarra-monitor. `animarSala(t)` hace pulsar líquidos y LEDs. Aquí van los objetos nuevos.
 - `src/agentes.js`: cuerpos de agentes, caminar (`caminarA`, `ruta` por el pasillo z=1.1), entregas de documentos.
 - `src/eventos.js`: bus de eventos + `guionDemo()` (tarea simulada con un rechazo del revisor).
+- `src/red.js`: cliente del backend (`backend/`, ver `docs/BACKEND.md`): manda la idea, consulta el estado y emite eventos al bus.
 - `src/jugador.js`: el visitante. Compu: primera persona con PointerLock (WASD, Shift, T, Esc). VR: stick izq. camina, der. gira 30°. Colisiones con círculos + límites de la sala.
 - `src/latigo.js`: látigo del visitante. Compu: click izquierdo en primera persona. VR: botón de agarre (squeeze). Cuerda = tubo de N segmentos que siguen el ángulo del mango con retraso; chasquido con WebAudio + destello. `alReventar(puntos)` da la cuerda en el mundo al reventar: si toca al presentador (`tocaAgente`), pasa a la siguiente diapositiva y el agente brinca (`asustar`) y se queja.
 - `src/util.js`: materiales, texto dibujado en canvas (etiquetas, pastillas), `sleep`.
@@ -47,5 +48,6 @@ IDs de agentes: `inv`, `red`, `rev`, `jefe`, `presentador` (el id de la escena =
 ## Ideas pendientes
 - Que los agentes volteen a ver al jugador cuando se acerca, y poder hablarles.
 - Ver el razonamiento de un agente flotando sobre él al acercarse.
+- **Unificar los dos backends**: `agentes/` (presentador, puerto 8000, eventos en vivo, campo «Presentador») y `backend/` (guion con contratos y pruebas, puerto 8001, sondeo desde `src/red.js`, formulario «Crear presentación», usa al Redactor que hoy está apagado por `EQUIPO_DEMO`).
 - Conectar más agentes reales (investigador, redactor, revisor) al servidor.
 - Escribir el tema dentro de la VR (teclado virtual o voz); hoy se escribe en el panel HTML.

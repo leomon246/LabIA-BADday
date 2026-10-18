@@ -5,3 +5,5 @@ Thumbs.db
 .venv/
 salidas/
 .env
+data/
+*.tmp

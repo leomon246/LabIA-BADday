@@ -7,6 +7,7 @@ import { VISITANTE, construirSala, animarSala, crearEscritorio, crearPizarra, pa
          pizarra, hayDiapositivas, cambiarDiapositiva } from './oficina.js';
 import { agentes, crearAgente, actualizarAgentes, asustar, tocaAgente } from './agentes.js';
 import { crearBus, guionDemo } from './eventos.js';
+import { crearPresentacion } from './red.js';
 import { crearJugador } from './jugador.js';
 import { crearLatigo } from './latigo.js';
 
@@ -118,7 +119,8 @@ document.getElementById('caminar').addEventListener('click', () => jugador.camin
 // --- panel HTML y bus ---
 const logEl = document.getElementById('log');
 function log(quien, texto) {
-  const li = document.createElement('li'); li.innerHTML = `<b>${quien}:</b> ${texto}`;
+  const li = document.createElement('li'), b = document.createElement('b');
+  b.textContent = quien + ': '; li.append(b, texto);   // textContent: los mensajes del backend no se interpretan como HTML
   logEl.prepend(li); while (logEl.children.length > 7) logEl.lastChild.remove();
 }
 const bus = crearBus(log);
@@ -166,6 +168,18 @@ async function pedirPresentacion() {
 }
 crearBtn.addEventListener('click', pedirPresentacion);
 temaEl.addEventListener('keydown', e => { if (e.key === 'Enter') pedirPresentacion(); });
+
+// Idea del usuario -> backend de guiones (backend/servidor.py, puerto 8001) -> eventos reales al bus
+const ideaForm = document.getElementById('ideaForm'), ideaIn = document.getElementById('idea'), crearGuion = document.getElementById('crearGuion');
+ideaForm.addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const idea = ideaIn.value.trim();
+  if (!idea || corriendo) return;
+  corriendo = true; crearGuion.disabled = btn.disabled = true;
+  try { const guion = await crearPresentacion(bus, idea); log('Sistema', `Guion listo: ${guion.titulo}`); }
+  catch (err) { log('Error', err.message); }
+  finally { corriendo = false; crearGuion.disabled = btn.disabled = false; }
+});
 document.getElementById('reset').addEventListener('click', () => location.reload());
 
 // --- bucle principal ---

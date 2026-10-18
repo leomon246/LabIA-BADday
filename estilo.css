@@ -10,6 +10,8 @@ body{background:var(--bg);color:var(--ink);font-family:"Familjen Grotesk",system
 .row{display:flex;gap:8px;flex-wrap:wrap}
 button{font:inherit;font-size:14px;border-radius:8px;padding:8px 12px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.idea{margin-bottom:8px}
+.idea input{flex:1 1 100%;font:inherit;font-size:14px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink)}
 button:disabled{opacity:.5;cursor:default}
 #log{margin:12px 0 0;padding:10px 0 0;border-top:1px solid var(--line);list-style:none;font-size:13px;line-height:1.5;max-height:150px;overflow:hidden}
 #log li{color:var(--muted)}#log li:first-child{color:var(--ink)}
