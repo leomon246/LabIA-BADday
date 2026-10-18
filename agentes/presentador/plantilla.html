@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITULO}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Fraunces:opsz,wght@9..144,500&family=STIX+Two+Text:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root { --fondo:#11131a; --texto:#eceae4; --suave:#9b9a94; --acento:#e8a54b; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { height:100%; background:var(--fondo); color:var(--texto);
+               font-family:Inter, sans-serif; overflow:hidden; }
+  .slide { position:absolute; inset:0; padding:8vh 10vw; display:flex;
+           flex-direction:column; justify-content:center; gap:4vh;
+           opacity:0; transform:translateY(20px); pointer-events:none;
+           transition:opacity .5s, transform .5s; }
+  .slide.activa { opacity:1; transform:none; pointer-events:auto; }
+  h1 { font-family:Fraunces, serif; font-weight:500; font-size:clamp(40px,7vw,96px); line-height:1.05; }
+  h2 { font-family:Fraunces, serif; font-weight:500; font-size:clamp(30px,4.5vw,60px); }
+  .sub { color:var(--suave); font-size:clamp(18px,2.2vw,28px); }
+  .linea { width:80px; height:4px; background:var(--acento); border-radius:2px; }
+  ul { list-style:none; display:flex; flex-direction:column; gap:2.5vh; }
+  li { font-size:clamp(20px,2.4vw,32px); line-height:1.4; padding-left:1.4em; position:relative; }
+  li::before { content:""; position:absolute; left:0; top:.6em; width:.5em; height:.5em;
+               border-radius:50%; background:var(--acento); }
+  .formula { font-family:"STIX Two Text", serif; font-style:italic; font-size:clamp(34px,5vw,72px);
+             color:var(--acento); text-align:center; padding:3vh 0; }
+  .nota { color:var(--suave); font-size:clamp(16px,1.6vw,22px); border-left:3px solid var(--acento);
+          padding-left:1em; }
+  .frag { opacity:0; transform:translateY(12px); transition:opacity .4s, transform .4s; }
+  .frag.visible { opacity:1; transform:none; }
+  #barra { position:fixed; left:0; bottom:0; height:4px; background:var(--acento); transition:width .4s; }
+  #num { position:fixed; right:24px; bottom:16px; color:var(--suave); font-size:14px; }
+</style>
+</head>
+<body>
+{{DIAPOSITIVAS}}
+<div id="barra"></div><div id="num"></div>
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  let s = 0, f = 0;
+  const frags = i => slides[i].querySelectorAll('.frag');
+  function pintar() {
+    slides.forEach((el, i) => el.classList.toggle('activa', i === s));
+    frags(s).forEach((el, i) => el.classList.toggle('visible', i < f));
+    document.getElementById('barra').style.width = ((s + 1) / slides.length * 100) + '%';
+    document.getElementById('num').textContent = (s + 1) + ' / ' + slides.length;
+  }
+  function siguiente() {
+    if (f < frags(s).length) f++;
+    else if (s < slides.length - 1) { s++; f = 0; }
+    pintar();
+  }
+  function anterior() {
+    if (f > 0) f--;
+    else if (s > 0) { s--; f = frags(s).length; }
+    pintar();
+  }
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) { e.preventDefault(); siguiente(); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); anterior(); }
+  });
+  document.addEventListener('click', siguiente);
+  pintar();
+</script>
+</body>
+</html>

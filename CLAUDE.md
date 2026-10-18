@@ -22,6 +22,7 @@ Responde siempre en español.
 - `src/jugador.js`: el visitante. Compu: primera persona con PointerLock (WASD, Shift, T, Esc). VR: stick izq. camina, der. gira 30°. Colisiones con círculos + límites de la sala.
 - `src/latigo.js`: látigo del visitante. Compu: click izquierdo en primera persona. VR: botón de agarre (squeeze). Cuerda = tubo de N segmentos que siguen el ángulo del mango con retraso; chasquido con WebAudio + destello.
 - `src/util.js`: materiales, texto dibujado en canvas (etiquetas, pastillas), `sleep`.
+- `agentes/`: backend de agentes en Python, **una carpeta por agente** (agregar = nueva carpeta, quitar = borrarla; `cargar_agentes()` los encuentra solo). Cada uno expone `NOMBRE`, `DESCRIPCION` y `ejecutar(entrada, emitir=None)`; `emitir` recibe eventos con el formato del bus. Correr: `py -m agentes [agente] [entrada]` (usa `.venv`, deps en `agentes/requirements.txt`). Hoy solo `presentador/` (texto -> diapositivas HTML con Gemini gratis, necesita `GEMINI_API_KEY`; salen en `salidas/`, ignorada por git).
 
 ## Regla de arquitectura (importante)
 Todo lo que pasa en la oficina entra por `bus.emitir(evento)`. La escena no sabe de dónde vienen

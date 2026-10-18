@@ -12,6 +12,7 @@ src/oficina.js    sala, escritorios, pantallas, pizarra  ← aquí agregas objet
 src/agentes.js    cuerpo de los agentes, caminar, entregas
 src/eventos.js    bus de eventos + guion de la demo
 src/util.js       materiales y texto en canvas
+agentes/          agentes en Python, uno por carpeta (hoy: presentador/)
 ```
 
 ## Correr en la compu
@@ -31,3 +32,17 @@ En el navegador del Quest: http://localhost:8000 → "Enter VR".
 Para ver la consola: chrome://inspect en la compu.
 
 Ciclo de trabajo: editas un archivo, guardas, recargas en los lentes.
+
+## Agentes (Python)
+
+Cada agente vive en su carpeta dentro de `agentes/`. Para agregar uno, crea una carpeta nueva
+(copia `presentador/`); para quitarlo, bórrala.
+
+```
+py -m venv .venv
+.venv\Scripts\pip install -r agentes/requirements.txt
+.venv\Scripts\python -m agentes                       # lista los agentes
+.venv\Scripts\python -m agentes presentador "tema"    # genera salidas/presentador/<tema>.html
+```
+El presentador usa Gemini gratis: saca una clave en https://aistudio.google.com/apikey y
+defínela como variable de entorno `GEMINI_API_KEY`.
