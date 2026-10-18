@@ -1,4 +1,4 @@
-// El espacio físico: sala, escritorios con pantallas y pizarra.
+// El espacio físico: el laboratorio, mesas con pantallas, equipos y pizarra.
 // Para agregar muebles u objetos nuevos, este es el archivo.
 import * as THREE from 'three';
 import { material, canvasTex, rr, FONT } from './util.js';
@@ -6,47 +6,159 @@ import { material, canvasTex, rr, FONT } from './util.js';
 export const VISITANTE = new THREE.Vector3(0, 0, 5.2);   // donde aparece la persona con los lentes
 export const pantallas = {};
 
+// Materiales que brillan y se animan en animarSala (líquidos, LEDs)
+const brillos = [];
+const brillo = (color, base = 0.8) => {
+  const m = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: base, roughness: 0.3 });
+  brillos.push({ m, base, fase: Math.random() * 6.28, vel: 0.8 + Math.random() * 1.6 }); return m;
+};
+const vidrio = new THREE.MeshStandardMaterial({ color: 0xD6EEF2, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false });
+const LIQUIDOS = [0x45D6C8, 0x7BE07A, 0xB07CE8, 0xF2B544];
+
+// Textura de canvas que se repite (baldosas del piso, paneles de pared)
+function textura(w, h, rx, ry, dibujar) {
+  const T = canvasTex(w, h); dibujar(T.ctx, w, h);
+  T.t.wrapS = T.t.wrapT = THREE.RepeatWrapping; T.t.repeat.set(rx, ry); T.t.needsUpdate = true;
+  return T.t;
+}
+const baldosa = (x, w, h) => {
+  x.fillStyle = '#DCE2E4'; x.fillRect(0, 0, w, h);
+  x.strokeStyle = '#B9C2C6'; x.lineWidth = 3; x.strokeRect(0, 0, w, h);
+};
+const panel = (x, w, h) => {
+  x.fillStyle = '#EEF2F3'; x.fillRect(0, 0, w, h);
+  x.fillStyle = '#C8D1D4'; x.fillRect(0, 0, 3, h); x.fillRect(0, h * 0.62, w, 2);   // juntas entre paneles
+};
+
 export function construirSala(scene) {
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8f8676, 2.6));
-  const sol = new THREE.DirectionalLight(0xfff1dc, 2.8);
+  scene.add(new THREE.HemisphereLight(0xF4FAFF, 0x6F7A80, 2.4));
+  const sol = new THREE.DirectionalLight(0xFFFFFF, 2.6);
   sol.position.set(-6, 9, 4); sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048);
   Object.assign(sol.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 });
   scene.add(sol);
 
-  const piso = new THREE.Mesh(new THREE.PlaneGeometry(16, 14), material(0xB9B2A6, 0.95));
-  piso.rotation.x = -Math.PI / 2; piso.receiveShadow = true; scene.add(piso);
-  const alfombra = new THREE.Mesh(new THREE.CircleGeometry(2.6, 48), material(0x8FA39C, 1));
-  alfombra.rotation.x = -Math.PI / 2; alfombra.position.set(0, 0.005, -1.2); alfombra.receiveShadow = true; scene.add(alfombra);
-
-  const pared = (w, h, x, z, ry, c = 0xA8B8A8) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material(c, 1));
-    m.position.set(x, h / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m);
+  // Piso de baldosas claras (1 m) y marcas de seguridad
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(16, 14),
+    new THREE.MeshStandardMaterial({ map: textura(128, 128, 16, 14, baldosa), roughness: 0.55 }));
+  piso.rotation.x = -Math.PI / 2; piso.position.z = 1; piso.receiveShadow = true; scene.add(piso);
+  const marca = (w, d, x, z, c) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: c }));
+    m.rotation.x = -Math.PI / 2; m.position.set(x, 0.006, z); scene.add(m);
   };
-  pared(16, 4, 0, -6, 0);
-  pared(14, 4, -8, 1, Math.PI / 2);
-  pared(14, 4, 8, 1, -Math.PI / 2, 0x9FB0A0);
+  marca(13, 0.07, 0, 0.45, 0xE2B93B); marca(13, 0.07, 0, 1.75, 0xE2B93B);   // bordes del pasillo de los agentes
+  const anillo = (r1, r2, op) => {
+    const m = new THREE.Mesh(new THREE.RingGeometry(r1, r2, 64),
+      new THREE.MeshBasicMaterial({ color: 0x45D6C8, transparent: true, opacity: op }));
+    m.rotation.x = -Math.PI / 2; m.position.set(0, 0.007, -1.2); scene.add(m);
+  };
+  anillo(2.5, 2.58, 0.9); anillo(2.25, 2.28, 0.5);
 
+  // Paredes de paneles blancos con zócalo oscuro y una línea de luz arriba
+  const zocalo = material(0x3C474C, 0.6), luz = new THREE.MeshBasicMaterial({ color: 0x9FEAE2 });
+  const pared = (w, x, z, ry) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 4),
+      new THREE.MeshStandardMaterial({ map: textura(128, 256, w / 2, 1, panel), roughness: 0.8 }));
+    m.position.y = 2; m.receiveShadow = true;
+    const z0 = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, 0.03), zocalo); z0.position.set(0, 0.09, 0.015);
+    const l = new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, 0.02), luz); l.position.set(0, 3.7, 0.01);
+    g.add(m, z0, l); scene.add(g);
+  };
+  pared(16, 0, -6, 0);
+  pared(14, -8, 1, Math.PI / 2);
+  pared(14, 8, 1, -Math.PI / 2);
+
+  // Ventanales de observación (pared izquierda)
+  const marcoMat = material(0x55605F, 0.4);
   for (let i = 0; i < 3; i++) {
-    const ventana = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2), new THREE.MeshBasicMaterial({ color: 0xF3F6F0 }));
-    ventana.position.set(-7.98, 2.1, -3.5 + i * 3.2); ventana.rotation.y = Math.PI / 2; scene.add(ventana);
+    const g = new THREE.Group(); g.position.set(-7.97, 2.0, -3.5 + i * 3.2); g.rotation.y = Math.PI / 2;
+    const cristal = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.8), new THREE.MeshBasicMaterial({ color: 0xBFD9E2 }));
+    const marco = new THREE.Mesh(new THREE.BoxGeometry(2.56, 1.96, 0.04), marcoMat); marco.position.z = -0.025;
+    const travesano = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.8, 0.03), marcoMat); travesano.position.z = 0.01;
+    g.add(marco, cristal, travesano); scene.add(g);
   }
-  for (let i = 0; i < 4; i++) {
-    const planta = new THREE.Group();
-    const maceta = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.4, 16), material(0xC97E5A)); maceta.position.y = 0.2;
-    const hojas = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 0), material(0x5E8A5A, 1)); hojas.position.y = 0.75; hojas.castShadow = true;
-    planta.add(maceta, hojas); planta.position.set(i % 2 ? 7.2 : -7.2, 0, i < 2 ? -5.2 : 3.5); scene.add(planta);
-  }
+
+  // Equipos en las esquinas (mismos lugares que los obstáculos de main.js)
+  crearTanque(scene, -7.2, -5.2, LIQUIDOS[0]);
+  crearTanque(scene, 7.2, -5.2, LIQUIDOS[2]);
+  crearRack(scene, -7.2, 3.5);
+  crearRack(scene, 7.2, 3.5);
+
+  // Repisas con frascos en la pared derecha (arriba de la cabeza)
+  const repisaMat = material(0xCFD6D9, 0.5);
+  [1.95, 2.45].forEach((y, n) => {
+    const r = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 4), repisaMat);
+    r.position.set(7.85, y, -2); r.castShadow = true; scene.add(r);
+    for (let k = 0; k < 7; k++) frasco(scene, 7.85, y + 0.015, -3.7 + k * 0.55 + Math.random() * 0.15, LIQUIDOS[(k + n) % 4], k % 2);
+  });
 }
 
-// Escritorio de pie con monitor. Devuelve dónde se para el agente y hacia dónde mira.
+// Geometrías compartidas de la cristalería
+const G = {
+  matraz: new THREE.CylinderGeometry(0.02, 0.075, 0.16, 16),
+  matrazLiq: new THREE.CylinderGeometry(0.04, 0.068, 0.08, 16),
+  vaso: new THREE.CylinderGeometry(0.05, 0.05, 0.14, 16),
+  vasoLiq: new THREE.CylinderGeometry(0.044, 0.044, 0.08, 16),
+};
+// Un matraz (tipo=1) o un vaso de precipitados (tipo=0) con líquido brillante
+function frasco(padre, x, y, z, color, tipo) {
+  const g = new THREE.Group(); g.position.set(x, y, z);
+  const liq = new THREE.Mesh(tipo ? G.matrazLiq : G.vasoLiq, brillo(color, 0.6)); liq.position.y = 0.04;
+  const cas = new THREE.Mesh(tipo ? G.matraz : G.vaso, vidrio); cas.position.y = tipo ? 0.08 : 0.07;
+  g.add(liq, cas); padre.add(g); return g;
+}
+
+function crearTanque(scene, x, z, color) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const metal = material(0x7D878B, 0.35);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.42, 0.16, 24), metal); base.position.y = 0.08;
+  const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.15, 24), brillo(color, 0.9)); liq.position.y = 0.74;
+  const cas = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.5, 24, 1, true), vidrio); cas.position.y = 0.91;
+  const tapa = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.14, 24), metal); tapa.position.y = 1.72;
+  const tubo = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 8), metal); tubo.position.y = 2.9;
+  base.castShadow = tapa.castShadow = true;
+  g.add(base, liq, cas, tapa, tubo); scene.add(g);
+}
+
+function crearRack(scene, x, z) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = x > 0 ? -Math.PI / 2 : Math.PI / 2;   // el frente mira al centro
+  const caja = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.0, 0.6), material(0x2B3236, 0.5));
+  caja.position.y = 1.0; caja.castShadow = true; g.add(caja);
+  const ranura = new THREE.BoxGeometry(0.66, 0.012, 0.01), led = new THREE.BoxGeometry(0.04, 0.04, 0.01);
+  const ranuraMat = material(0x46525A, 0.5);
+  for (let i = 0; i < 9; i++) {
+    const y = 0.35 + i * 0.18;
+    const r = new THREE.Mesh(ranura, ranuraMat); r.position.set(0, y - 0.06, 0.305); g.add(r);
+    for (let k = 0; k < 3; k++) {
+      const l = new THREE.Mesh(led, brillo(LIQUIDOS[(i + k) % 3 ? 0 : 1], 1.2)); l.position.set(-0.28 + k * 0.07, y, 0.305); g.add(l);
+    }
+  }
+  scene.add(g);
+}
+
+// Pulso suave de líquidos y LEDs. Llamar en cada cuadro con el tiempo en segundos.
+export function animarSala(t) {
+  for (const b of brillos) b.m.emissiveIntensity = b.base * (0.65 + 0.35 * Math.sin(t * b.vel + b.fase));
+}
+
+// Mesa de laboratorio con monitor y cristalería. Devuelve dónde se para el agente y hacia dónde mira.
+let nMesas = 0;
 export function crearEscritorio(scene, id, x, z) {
-  const madera = material(0xD8C7A6, 0.7), metal = material(0x55605F, 0.5);
+  const metal = material(0x7D878B, 0.35);
   const g = new THREE.Group(); g.position.set(x, 0, z);
   g.rotation.y = Math.atan2(VISITANTE.x - x, VISITANTE.z - z);   // la pantalla mira hacia el visitante
-  const tablero = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.8), madera);
+  const tablero = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.05, 0.8), material(0xF1F4F5, 0.35));
   tablero.position.y = 1.0; tablero.castShadow = tablero.receiveShadow = true; g.add(tablero);
-  for (const [lx, lz] of [[-0.78, -0.33], [0.78, -0.33], [-0.78, 0.33], [0.78, 0.33]]) {
-    const pata = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1, 0.05), metal); pata.position.set(lx, 0.5, lz); pata.castShadow = true; g.add(pata);
+  const borde = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.012, 0.012), new THREE.MeshBasicMaterial({ color: 0x45D6C8 }));
+  borde.position.set(0, 0.97, 0.4); g.add(borde);
+  // gabinete a la derecha, patas a la izquierda (espacio para las piernas)
+  const gabinete = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.95, 0.72), material(0x3C474C, 0.55));
+  gabinete.position.set(0.42, 0.475, 0); gabinete.castShadow = true; g.add(gabinete);
+  for (const y of [0.3, 0.68]) {
+    const asa = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.02), metal); asa.position.set(0.42, y, 0.37); g.add(asa);
+  }
+  for (const lz of [-0.33, 0.33]) {
+    const pata = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1, 0.05), metal); pata.position.set(-0.78, 0.5, lz); pata.castShadow = true; g.add(pata);
   }
   const marco = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.54, 0.04), material(0x2A3335, 0.4));
   marco.position.set(0.18, 1.42, -0.22); marco.castShadow = true; g.add(marco);
@@ -54,6 +166,11 @@ export function crearEscritorio(scene, id, x, z) {
   const pantalla = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.47), new THREE.MeshBasicMaterial({ map: S.t }));
   pantalla.position.set(0.18, 1.42, -0.199); g.add(pantalla);
   const base = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.06), metal); base.position.set(0.18, 1.12, -0.24); g.add(base);
+  // cristalería a la izquierda del monitor
+  const n = nMesas++, c = LIQUIDOS.length;
+  frasco(g, -0.62, 1.025, -0.2, LIQUIDOS[n % c], 1);
+  frasco(g, -0.45, 1.025, -0.26, LIQUIDOS[(n + 1) % c], 0);
+  frasco(g, -0.68, 1.025, 0.02, LIQUIDOS[(n + 2) % c], 0);
   scene.add(g);
 
   pantallas[id] = { S, lineas: [], animo: 'idle', titulo: '' };
@@ -72,25 +189,28 @@ export function dibujarPantalla(id) {
   s.S.t.needsUpdate = true;
 }
 
+// Pizarra: un monitor grande en la pared del fondo
 let P;
 export function crearPizarra(scene) {
   P = canvasTex(1024, 560);
   const tablero = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.3), new THREE.MeshBasicMaterial({ map: P.t }));
   tablero.position.set(0, 2.15, -5.95); scene.add(tablero);
-  const marco = new THREE.Mesh(new THREE.BoxGeometry(4.36, 2.46, 0.05), material(0x55605F, 0.5));
+  const marco = new THREE.Mesh(new THREE.BoxGeometry(4.36, 2.46, 0.05), material(0x2A3335, 0.4));
   marco.position.set(0, 2.15, -5.99); scene.add(marco);
+  const halo = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 2.6), new THREE.MeshBasicMaterial({ color: 0x45D6C8 }));
+  halo.position.set(0, 2.15, -5.995); scene.add(halo);
   dibujarPizarra('Sin tareas', []);
 }
-const ESTADOS = { pendiente: ['#9AA5A2', 'Pendiente'], curso: ['#D9A93B', 'En curso'], revision: ['#8A4F7D', 'En revisión'], rechazado: ['#C4523E', 'Corrigiendo'], hecho: ['#3E8E4F', 'Hecho'] };
+const ESTADOS = { pendiente: ['#6F7C80', 'Pendiente'], curso: ['#D9A93B', 'En curso'], revision: ['#9A5F8D', 'En revisión'], rechazado: ['#C4523E', 'Corrigiendo'], hecho: ['#3E9E5A', 'Hecho'] };
 export function dibujarPizarra(titulo, tareas) {
-  const x = P.ctx; x.fillStyle = '#F6F7F3'; x.fillRect(0, 0, 1024, 560);
-  x.fillStyle = '#1F2A2E'; x.font = `600 46px ${FONT}`; x.fillText(titulo, 48, 82);
-  x.fillStyle = '#C9D0CC'; x.fillRect(48, 108, 928, 3);
+  const x = P.ctx; x.fillStyle = '#0F1B20'; x.fillRect(0, 0, 1024, 560);
+  x.fillStyle = '#E6F4F2'; x.font = `600 46px ${FONT}`; x.fillText(titulo, 48, 82);
+  x.fillStyle = '#2C4A50'; x.fillRect(48, 108, 928, 3);
   tareas.forEach((t, i) => {
     const y = 180 + i * 92, [col, etiqueta] = ESTADOS[t.estado];
     x.fillStyle = col; x.beginPath(); x.arc(70, y - 12, 16, 0, Math.PI * 2); x.fill();
-    x.fillStyle = '#1F2A2E'; x.font = `600 38px ${FONT}`; x.fillText(t.nombre, 104, y);
-    x.fillStyle = '#4C5B5E'; x.font = `400 32px ${FONT}`; x.fillText(t.quien, 470, y);
+    x.fillStyle = '#E6F4F2'; x.font = `600 38px ${FONT}`; x.fillText(t.nombre, 104, y);
+    x.fillStyle = '#8FB3B0'; x.font = `400 32px ${FONT}`; x.fillText(t.quien, 470, y);
     x.fillStyle = col; rr(x, 742, y - 44, 232, 56, 28); x.fill();
     x.fillStyle = '#fff'; x.font = `600 28px ${FONT}`; x.textAlign = 'center'; x.fillText(etiqueta, 858, y - 6); x.textAlign = 'left';
   });

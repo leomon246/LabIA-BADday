@@ -16,7 +16,7 @@ Responde siempre en español.
 ## Estructura
 - `index.html` / `estilo.css`: página y panel HTML (solo visible fuera de VR).
 - `src/main.js`: escena, render, botón VR, controles del Quest, bucle principal.
-- `src/oficina.js`: sala, escritorios con pantallas, pizarra. Aquí van los objetos nuevos.
+- `src/oficina.js`: el laboratorio (baldosas, paredes de paneles, tanques, racks, repisas con frascos), mesas de laboratorio con pantallas, pizarra-monitor. `animarSala(t)` hace pulsar líquidos y LEDs. Aquí van los objetos nuevos.
 - `src/agentes.js`: cuerpos de agentes, caminar (`caminarA`, `ruta` por el pasillo z=1.1), entregas de documentos.
 - `src/eventos.js`: bus de eventos + `guionDemo()` (tarea simulada con un rechazo del revisor).
 - `src/jugador.js`: el visitante. Compu: primera persona con PointerLock (WASD, Shift, T, Esc). VR: stick izq. camina, der. gira 30°. Colisiones con círculos + límites de la sala.

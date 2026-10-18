@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { VISITANTE, construirSala, crearEscritorio, crearPizarra, pantallas, dibujarPantalla, dibujarPizarra } from './oficina.js';
+import { VISITANTE, construirSala, animarSala, crearEscritorio, crearPizarra, pantallas, dibujarPantalla, dibujarPizarra } from './oficina.js';
 import { agentes, crearAgente, actualizarAgentes } from './agentes.js';
 import { crearBus, guionDemo } from './eventos.js';
 import { crearJugador } from './jugador.js';
@@ -13,8 +13,8 @@ const app = document.getElementById('app');
 
 // --- escena y render ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xDDE3E0);
-scene.fog = new THREE.Fog(0xDDE3E0, 16, 32);
+scene.background = new THREE.Color(0xE4EAEC);
+scene.fog = new THREE.Fog(0xE4EAEC, 16, 32);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -62,7 +62,7 @@ for (let i = 0; i < 2; i++) {
   rig.add(agarre);
 }
 
-// --- construir la oficina ---
+// --- construir el laboratorio ---
 construirSala(scene);
 crearPizarra(scene);
 const dInv = crearEscritorio(scene, 'inv', -4, -1.0);
@@ -80,7 +80,7 @@ const jugador = crearJugador({
   poseOrbita: new THREE.Vector3(0, 3.4, 3.2),
   obstaculos: [                                   // círculos en el piso que no se pueden atravesar
     { x: -4, z: -1.0, r: 1.05 }, { x: 0, z: -2.4, r: 1.05 }, { x: 4, z: -1.0, r: 1.05 },   // escritorios
-    { x: -7.2, z: -5.2, r: 0.5 }, { x: 7.2, z: -5.2, r: 0.5 }, { x: -7.2, z: 3.5, r: 0.5 }, { x: 7.2, z: 3.5, r: 0.5 },  // plantas
+    { x: -7.2, z: -5.2, r: 0.5 }, { x: 7.2, z: -5.2, r: 0.5 }, { x: -7.2, z: 3.5, r: 0.5 }, { x: 7.2, z: 3.5, r: 0.5 },  // tanques y racks
   ],
 });
 document.getElementById('caminar').addEventListener('click', () => jugador.caminar());
@@ -108,6 +108,7 @@ const reloj = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(reloj.getDelta(), 0.05);
   actualizarAgentes(dt);
+  animarSala(reloj.elapsedTime);
   jugador.actualizar(dt);
   latigo.actualizar(dt);
   renderer.render(scene, camera);
