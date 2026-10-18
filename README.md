@@ -44,5 +44,15 @@ py -m venv .venv
 .venv\Scripts\python -m agentes                       # lista los agentes
 .venv\Scripts\python -m agentes presentador "tema"    # genera salidas/presentador/<tema>.html
 ```
+Para verlo en el laboratorio VR, en vez de `python -m http.server` corre (no los mezcles: el
+`http.server` deja archivos viejos en la caché del navegador):
+
+```
+.venv\Scripts\python -m agentes.servidor
+```
+Abre http://localhost:8000, escribe un tema en el panel (campo "Presentador") y pulsa Crear.
+Las diapositivas aparecen en el monitor grande del fondo: flechas ← → en la compu; en VR,
+gatillo apuntando al monitor (tercio izquierdo = atrás).
+
 El presentador usa Gemini gratis: saca una clave en https://aistudio.google.com/apikey y
 ponla en un archivo `.env` en la raíz (`GEMINI_API_KEY=...`). Ese archivo está en `.gitignore`.

@@ -19,11 +19,16 @@
 <div id="app">
   <div id="hud">
     <h1>Laboratorio de agentes</h1>
-    <p>Caminar: WASD + mouse, Shift corre, T lanza la tarea, Esc sale. En VR: stick izquierdo camina, derecho gira, gatillo lanza la tarea.</p>
+    <p>Caminar: WASD + mouse, Shift corre, click = látigo, Esc sale. Para pasar diapositivas: flechas, o un latigazo al Presentador. En VR: stick izquierdo camina, derecho gira, agarre = látigo, gatillo apuntando al monitor grande pasa diapositivas.</p>
     <div class="row">
       <button class="primary" id="go">Lanzar tarea de prueba</button>
       <button id="caminar">Caminar</button>
       <button id="reset">Reiniciar</button>
+    </div>
+    <div id="presentador">
+      <label for="tema">Presentador</label>
+      <div class="row"><input id="tema" placeholder="Tema de la presentación" autocomplete="off"><button id="crear" disabled>Crear</button></div>
+      <small id="servidor">Buscando servidor de agentes…</small>
     </div>
     <ol id="log"><li>Arrastra para girar la vista, rueda para acercar.</li></ol>
   </div>

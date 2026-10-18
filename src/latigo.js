@@ -1,6 +1,7 @@
 // El látigo del visitante.
 //  - Compu (primera persona): aparece en la mano derecha; click izquierdo = chasquido.
-//  - VR: va en el control; botón de agarre (squeeze) = chasquido. El gatillo sigue lanzando la tarea.
+//  - VR: va en el control; botón de agarre (squeeze) = chasquido.
+// alReventar(puntos) recibe la cuerda en coordenadas del mundo justo cuando la punta revienta (para saber a quién le pegó).
 // La animación es una cadena de segmentos: cada uno copia el ángulo del mango con un pequeño
 // retraso, así la onda viaja del mango a la punta y "revienta" al final (sonido + destello).
 import * as THREE from 'three';
@@ -28,7 +29,7 @@ function guia(t) {
   return REPOSO;
 }
 
-export function crearLatigo({ renderer, camera }) {
+export function crearLatigo({ renderer, camera, alReventar }) {
   const grupo = new THREE.Group();
   grupo.visible = false;
 
@@ -164,6 +165,7 @@ export function crearLatigo({ renderer, camera }) {
     // La punta revienta cuando la onda del latigazo llega hasta ella
     if (!reventado && t - N * RETRASO >= T2) {
       reventado = true; sonar(); vidaDestello = 0.14;
+      if (alReventar) alReventar(puntos.map(p => p.clone().applyMatrix4(grupo.matrixWorld)));
     }
     if (vidaDestello > 0) {
       vidaDestello -= dt;

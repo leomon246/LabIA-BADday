@@ -45,6 +45,7 @@ def cargar_agentes() -> dict:
             mod = importlib.import_module(f"{__name__}.{m.name}")
         except ImportError as err:   # p. ej. le falta una librería: no tumba a los demás
             print(f"[aviso] no se pudo cargar el agente '{m.name}': {err}")
+            print("        ¿Usaste el Python del proyecto? Corre con: .venv\\Scripts\\python -m agentes...")
             continue
         encontrados[mod.NOMBRE] = mod
     return encontrados

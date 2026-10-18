@@ -14,3 +14,7 @@ button:disabled{opacity:.5;cursor:default}
 #log{margin:12px 0 0;padding:10px 0 0;border-top:1px solid var(--line);list-style:none;font-size:13px;line-height:1.5;max-height:150px;overflow:hidden}
 #log li{color:var(--muted)}#log li:first-child{color:var(--ink)}
 #vrslot{position:absolute;bottom:14px;left:50%;transform:translateX(-50%)}
+#presentador{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+#presentador label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+#presentador input{flex:1;min-width:0;font:inherit;font-size:14px;border-radius:8px;padding:8px 10px;border:1px solid var(--line);background:transparent;color:var(--ink)}
+#presentador small{display:block;margin-top:6px;font-size:12px;color:var(--muted)}

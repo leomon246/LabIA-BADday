@@ -1,5 +1,5 @@
 // El bus de eventos: TODO lo que pasa en la oficina entra por bus.emitir(evento).
-// Hoy los eventos los genera guionDemo(); después los mandará el backend de agentes por WebSocket.
+// Vienen de guionDemo() (simulado) o del servidor de agentes en Python (agentes/servidor.py, ver conectarServidor en main.js).
 //
 // Tipos de evento:
 //   { tipo:'estado',   agente, texto, animo?, titulo? }   animo: idle | work | alert | ok
@@ -7,14 +7,16 @@
 //   { tipo:'pizarra',  titulo, tareas:[{nombre, quien, estado}] }
 //   { tipo:'entrega',  agente, a, item }
 //   { tipo:'presentar',agente, texto }
+//   { tipo:'diapositivas', agente, titulo, subtitulo, diapositivas:[{titulo, puntos, formula, nota}] }
 import { agentes, entregar, caminarA, ruta } from './agentes.js';
-import { pantallas, dibujarPantalla, dibujarPizarra } from './oficina.js';
+import { pantallas, dibujarPantalla, dibujarPizarra, mostrarDiapositivas } from './oficina.js';
 import { sleep } from './util.js';
 
 export function crearBus(log) {
   return {
     async emitir(e) {
       const a = agentes[e.agente];
+      if ((e.agente && !a) || (e.a && !agentes[e.a])) { console.warn('Evento para un agente que no está en la escena:', e); return; }
       switch (e.tipo) {
         case 'estado':
           a.etiqueta.dibujar(e.texto); log(a.nombre, e.texto);
@@ -32,6 +34,9 @@ export function crearBus(log) {
         case 'entrega':
           log(a.nombre, `lleva "${e.item}" a ${agentes[e.a].nombre}`);
           await entregar(e.agente, e.a, e.item);
+          break;
+        case 'diapositivas':
+          mostrarDiapositivas(e); log(a.nombre, `presenta "${e.titulo}"`);
           break;
         case 'presentar':
           a.etiqueta.dibujar(e.texto); log(a.nombre, e.texto);

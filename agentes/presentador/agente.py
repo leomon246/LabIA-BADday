@@ -114,6 +114,8 @@ def ejecutar(entrada: str, emitir=None) -> str:
     SALIDAS.mkdir(parents=True, exist_ok=True)
     salida = SALIDAS / nombre_archivo(presentacion.titulo)
     salida.write_text(armar_html(presentacion), encoding="utf-8")
+    # La escena VR muestra esto en el monitor grande del fondo
+    avisar({"tipo": "diapositivas", "agente": NOMBRE, **presentacion.model_dump()})
     avisar({"tipo": "estado", "agente": NOMBRE, "animo": "ok",
             "texto": f"Listo: {len(presentacion.diapositivas) + 1} diapositivas"})
     return str(salida)

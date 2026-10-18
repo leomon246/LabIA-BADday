@@ -16,7 +16,7 @@ export function crearAgente(scene, id, nombre, color, casa, yaw) {
   g.add(cuerpo, cabeza, visor, etiqueta.sprite);
   g.position.copy(casa); g.rotation.y = yaw; scene.add(g);
   agentes[id] = { id, nombre, color, g, etiqueta, visorMat, casa: casa.clone(), yawCasa: yaw,
-                  camino: [], mirarYaw: yaw, velocidad: 1.6, paso: 0, alLlegar: null };
+                  camino: [], mirarYaw: yaw, velocidad: 1.6, paso: 0, alLlegar: null, susto: 0 };
 }
 
 // --- movimiento ---
@@ -29,9 +29,26 @@ export function caminarA(ag, puntos, yawFinal) {
   return new Promise(res => { ag.camino = puntos; ag.mirarYaw = null; ag.alLlegar = () => { ag.mirarYaw = yawFinal; res(); }; });
 }
 
+// Brinco y temblor cuando le pegan con el látigo
+const SUSTO = 0.6;
+export function asustar(id) { if (agentes[id]) agentes[id].susto = SUSTO; }
+
+// ¿Algún punto (en el mundo) toca el cuerpo del agente? Cilindro de radio 'r' y 1.75 m de alto.
+export function tocaAgente(id, puntos, r = 0.4) {
+  const p = agentes[id]?.g.position;
+  return !!p && puntos.some(q => q.y < 1.75 && Math.hypot(q.x - p.x, q.z - p.z) < r);
+}
+
 export function actualizarAgentes(dt) {
   for (const a of Object.values(agentes)) {
     const p = a.g.position;
+    if (a.susto > 0) {
+      a.susto = Math.max(0, a.susto - dt);
+      const k = a.susto / SUSTO, f = 1 - k;
+      p.y = Math.sin(f * Math.PI) * 0.22;
+      a.g.rotation.z = Math.sin(f * 40) * 0.18 * k;
+      if (!a.susto) { p.y = 0; a.g.rotation.z = 0; }
+    }
     if (a.camino.length) {
       const t = a.camino[0], dx = t.x - p.x, dz = t.z - p.z, d = Math.hypot(dx, dz);
       if (d < 0.03) {

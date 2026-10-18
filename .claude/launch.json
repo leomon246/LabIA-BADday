@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "oficina", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8000"], "port": 8000 }
+    { "name": "oficina", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8000"], "port": 8000 },
+    { "name": "laboratorio", "runtimeExecutable": ".venv/Scripts/python.exe", "runtimeArgs": ["-m", "agentes.servidor", "8010"], "port": 8010, "autoPort": false }
   ]
 }

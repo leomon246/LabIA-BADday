@@ -189,12 +189,14 @@ export function dibujarPantalla(id) {
   s.S.t.needsUpdate = true;
 }
 
-// Pizarra: un monitor grande en la pared del fondo
+// Pizarra: un monitor grande en la pared del fondo. Muestra la lista de tareas
+// o, si llega una presentación, sus diapositivas.
 let P;
+export let pizarra;   // la malla, para apuntarle con el rayo del control
 export function crearPizarra(scene) {
   P = canvasTex(1024, 560);
   const tablero = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.3), new THREE.MeshBasicMaterial({ map: P.t }));
-  tablero.position.set(0, 2.15, -5.95); scene.add(tablero);
+  tablero.position.set(0, 2.15, -5.95); scene.add(tablero); pizarra = tablero;
   const marco = new THREE.Mesh(new THREE.BoxGeometry(4.36, 2.46, 0.05), material(0x2A3335, 0.4));
   marco.position.set(0, 2.15, -5.99); scene.add(marco);
   const halo = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 2.6), new THREE.MeshBasicMaterial({ color: 0x45D6C8 }));
@@ -203,6 +205,7 @@ export function crearPizarra(scene) {
 }
 const ESTADOS = { pendiente: ['#6F7C80', 'Pendiente'], curso: ['#D9A93B', 'En curso'], revision: ['#9A5F8D', 'En revisión'], rechazado: ['#C4523E', 'Corrigiendo'], hecho: ['#3E9E5A', 'Hecho'] };
 export function dibujarPizarra(titulo, tareas) {
+  presentacion = null;
   const x = P.ctx; x.fillStyle = '#0F1B20'; x.fillRect(0, 0, 1024, 560);
   x.fillStyle = '#E6F4F2'; x.font = `600 46px ${FONT}`; x.fillText(titulo, 48, 82);
   x.fillStyle = '#2C4A50'; x.fillRect(48, 108, 928, 3);
@@ -214,5 +217,70 @@ export function dibujarPizarra(titulo, tareas) {
     x.fillStyle = col; rr(x, 742, y - 44, 232, 56, 28); x.fill();
     x.fillStyle = '#fff'; x.font = `600 28px ${FONT}`; x.textAlign = 'center'; x.fillText(etiqueta, 858, y - 6); x.textAlign = 'left';
   });
+  P.t.needsUpdate = true;
+}
+
+// --- Diapositivas en la pizarra ---
+let presentacion = null, actual = 0;
+
+// Corta un texto en líneas que quepan en 'ancho' px con la fuente actual del contexto
+function envolver(x, texto, ancho) {
+  const lineas = []; let linea = '';
+  for (const palabra of texto.split(' ')) {
+    const prueba = linea ? linea + ' ' + palabra : palabra;
+    if (x.measureText(prueba).width > ancho && linea) { lineas.push(linea); linea = palabra; } else linea = prueba;
+  }
+  if (linea) lineas.push(linea);
+  return lineas;
+}
+
+// p = { titulo, subtitulo, diapositivas:[{titulo, puntos, formula, nota}] }
+export function mostrarDiapositivas(p) { presentacion = p; actual = 0; dibujarDiapositiva(); }
+export const hayDiapositivas = () => presentacion !== null;
+export function cambiarDiapositiva(paso) {
+  if (!presentacion) return;
+  actual = Math.max(0, Math.min(presentacion.diapositivas.length, actual + paso));   // 0 = portada
+  dibujarDiapositiva();
+}
+
+function dibujarDiapositiva() {
+  const x = P.ctx, total = presentacion.diapositivas.length + 1, ACENTO = '#45D6C8';
+  x.fillStyle = '#0F1B20'; x.fillRect(0, 0, 1024, 560);
+  if (actual === 0) {   // portada
+    x.fillStyle = ACENTO; x.fillRect(64, 170, 90, 6);
+    x.fillStyle = '#E6F4F2'; x.font = `600 64px ${FONT}`;
+    let y = 260; for (const l of envolver(x, presentacion.titulo, 880).slice(0, 2)) { x.fillText(l, 64, y); y += 74; }
+    x.fillStyle = '#8FB3B0'; x.font = `400 32px ${FONT}`;
+    for (const l of envolver(x, presentacion.subtitulo, 880).slice(0, 2)) { x.fillText(l, 64, y + 6); y += 42; }
+  } else {
+    const d = presentacion.diapositivas[actual - 1];
+    x.fillStyle = '#E6F4F2'; x.font = `600 46px ${FONT}`; x.fillText(envolver(x, d.titulo, 900)[0], 56, 84);
+    x.fillStyle = '#2C4A50'; x.fillRect(56, 108, 912, 3);
+    let y = 166; x.font = `400 31px ${FONT}`;
+    for (const punto of d.puntos) {
+      const lineas = envolver(x, punto, 860);
+      x.fillStyle = ACENTO; x.beginPath(); x.arc(70, y - 10, 7, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#E6F4F2'; lineas.forEach((l, i) => x.fillText(l, 96, y + i * 38));
+      y += lineas.length * 38 + 16;
+    }
+    // la nota va abajo; la fórmula, entre los puntos y la nota
+    x.font = `400 24px ${FONT}`;
+    const nota = d.nota && d.nota.trim() ? envolver(x, d.nota, 860).slice(0, 2) : [];
+    const yNota = 530 - nota.length * 30;
+    if (d.formula && d.formula.trim()) {
+      x.fillStyle = ACENTO; x.font = `italic 500 44px Georgia, serif`; x.textAlign = 'center';
+      x.fillText(d.formula, 512, Math.min(y + 40, yNota - (nota.length ? 44 : 16)), 900); x.textAlign = 'left';
+    }
+    if (nota.length) {
+      x.font = `400 24px ${FONT}`;
+      x.fillStyle = ACENTO; x.fillRect(56, yNota - 24, 4, nota.length * 30);
+      x.fillStyle = '#8FB3B0'; nota.forEach((l, i) => x.fillText(l, 74, yNota + i * 30));
+    }
+  }
+  // barra de progreso y número
+  x.fillStyle = '#2C4A50'; x.fillRect(0, 552, 1024, 8);
+  x.fillStyle = ACENTO; x.fillRect(0, 552, 1024 * (actual + 1) / total, 8);
+  x.fillStyle = '#8FB3B0'; x.font = `400 22px ${FONT}`; x.textAlign = 'right';
+  x.fillText(`${actual + 1} / ${total}`, 990, 536); x.textAlign = 'left';
   P.t.needsUpdate = true;
 }

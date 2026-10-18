@@ -8,32 +8,36 @@ Responde siempre en español.
 
 ## Stack
 - WebXR + three.js 0.170 (módulos ES vía importmap desde jsDelivr, sin bundler, sin npm).
-- Se prueba con `python -m http.server 8000` y se abre `http://localhost:8000`.
+- Se prueba con `.venv\Scripts\python -m agentes.servidor` (sirve la página + agentes) y se abre `http://localhost:8000`.
+  No usar `python -m http.server`: deja los .js en caché del navegador y luego se ven versiones viejas
+  El servidor de agentes evita eso: manda `Cache-Control: no-store` y sirve index.html con `?v=<fecha>` en cada .js
+  (importmap generado en `servir_index`), así un archivo cambiado siempre tiene URL nueva.
 - Visor: Meta Quest. En los lentes: `adb reverse tcp:8000 tcp:8000` y abrir localhost:8000 en su navegador.
 - Sin lentes: extensión de Chrome "Immersive Web Emulator".
 - No usar Unity ni frameworks pesados; mantenerlo simple.
 
 ## Estructura
 - `index.html` / `estilo.css`: página y panel HTML (solo visible fuera de VR).
-- `src/main.js`: escena, render, botón VR, controles del Quest, bucle principal.
+- `src/main.js`: escena, render, botón VR, controles del Quest, bucle principal. `EQUIPO_DEMO` (hoy `false`) prende/apaga investigador, redactor y revisor con sus mesas y la demo `guionDemo()`; ahora en la escena solo están `jefe` y `presentador`.
 - `src/oficina.js`: sala, escritorios con pantallas, pizarra. Aquí van los objetos nuevos.
 - `src/agentes.js`: cuerpos de agentes, caminar (`caminarA`, `ruta` por el pasillo z=1.1), entregas de documentos.
 - `src/eventos.js`: bus de eventos + `guionDemo()` (tarea simulada con un rechazo del revisor).
 - `src/jugador.js`: el visitante. Compu: primera persona con PointerLock (WASD, Shift, T, Esc). VR: stick izq. camina, der. gira 30°. Colisiones con círculos + límites de la sala.
-- `src/latigo.js`: látigo del visitante. Compu: click izquierdo en primera persona. VR: botón de agarre (squeeze). Cuerda = tubo de N segmentos que siguen el ángulo del mango con retraso; chasquido con WebAudio + destello.
+- `src/latigo.js`: látigo del visitante. Compu: click izquierdo en primera persona. VR: botón de agarre (squeeze). Cuerda = tubo de N segmentos que siguen el ángulo del mango con retraso; chasquido con WebAudio + destello. `alReventar(puntos)` da la cuerda en el mundo al reventar: si toca al presentador (`tocaAgente`), pasa a la siguiente diapositiva y el agente brinca (`asustar`) y se queja.
 - `src/util.js`: materiales, texto dibujado en canvas (etiquetas, pastillas), `sleep`.
-- `agentes/`: backend de agentes en Python, **una carpeta por agente** (agregar = nueva carpeta, quitar = borrarla; `cargar_agentes()` los encuentra solo). Cada uno expone `NOMBRE`, `DESCRIPCION` y `ejecutar(entrada, emitir=None)`; `emitir` recibe eventos con el formato del bus. Correr: `py -m agentes [agente] [entrada]` (usa `.venv`, deps en `agentes/requirements.txt`). Hoy solo `presentador/` (texto -> diapositivas HTML con Gemini gratis, necesita `GEMINI_API_KEY` en `.env` de la raíz, ignorado por git; prueba varios modelos Flash si uno da 503; salen en `salidas/`, ignorada por git).
+- `agentes/`: backend de agentes en Python, **una carpeta por agente** (agregar = nueva carpeta, quitar = borrarla; `cargar_agentes()` los encuentra solo). Cada uno expone `NOMBRE`, `DESCRIPCION` y `ejecutar(entrada, emitir=None)`; `emitir` recibe eventos con el formato del bus. `agentes/servidor.py` (solo librería estándar) sirve la web, recibe `POST /api/ejecutar {agente, entrada}` y manda los eventos al navegador por `GET /api/eventos` (Server-Sent Events) → `bus.emitir()`. En terminal: `py -m agentes [agente] [entrada]` (usa `.venv`, deps en `agentes/requirements.txt`). Hoy solo `presentador/` (texto -> diapositivas HTML con Gemini gratis, necesita `GEMINI_API_KEY` en `.env` de la raíz, ignorado por git; prueba varios modelos Flash si uno da 503; salen en `salidas/`, ignorada por git).
 
 ## Regla de arquitectura (importante)
 Todo lo que pasa en la oficina entra por `bus.emitir(evento)`. La escena no sabe de dónde vienen
-los eventos. Hoy los genera `guionDemo()`; después los mandará un backend de agentes en Python por WebSocket.
+los eventos. Los genera `guionDemo()` (simulado) o el servidor de agentes en Python (`agentes/servidor.py`, por Server-Sent Events).
 No romper este contrato:
 - `{ tipo:'estado', agente, texto, animo?, titulo? }`  animo: idle | work | alert | ok
 - `{ tipo:'pantalla', agente, linea, animo? }`
 - `{ tipo:'pizarra', titulo, tareas:[{nombre, quien, estado}] }`  estado: pendiente | curso | revision | rechazado | hecho
 - `{ tipo:'entrega', agente, a, item }`
 - `{ tipo:'presentar', agente, texto }`
-IDs de agentes: `inv`, `red`, `rev`, `jefe`.
+- `{ tipo:'diapositivas', agente, titulo, subtitulo, diapositivas:[{titulo, puntos, formula, nota}] }`  se ven en la pizarra-monitor; las pasan las flechas, el gatillo apuntando al monitor o un latigazo al presentador
+IDs de agentes: `inv`, `red`, `rev`, `jefe`, `presentador` (el id de la escena = `NOMBRE` del agente Python).
 
 ## Convenciones
 - Nombres de funciones y variables en español.
@@ -43,4 +47,5 @@ IDs de agentes: `inv`, `red`, `rev`, `jefe`.
 ## Ideas pendientes
 - Que los agentes volteen a ver al jugador cuando se acerca, y poder hablarles.
 - Ver el razonamiento de un agente flotando sobre él al acercarse.
-- Backend real de agentes (Python) conectado por WebSocket al bus.
+- Conectar más agentes reales (investigador, redactor, revisor) al servidor.
+- Escribir el tema dentro de la VR (teclado virtual o voz); hoy se escribe en el panel HTML.

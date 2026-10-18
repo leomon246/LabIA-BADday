@@ -13,8 +13,9 @@ from . import cargar_agentes
 
 
 def mostrar_evento(e: dict):
-    detalle = e.get("texto") or e.get("linea") or ""
-    print(f"  [{e['agente']}] {detalle}")
+    detalle = e.get("texto") or e.get("linea") or e.get("titulo")
+    if detalle:
+        print(f"  [{e['agente']}] {detalle}")
 
 
 def main():
