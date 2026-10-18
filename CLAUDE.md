@@ -19,6 +19,7 @@ Responde siempre en español.
 - `src/oficina.js`: el laboratorio (baldosas, paredes de paneles, tanques, racks, repisas con frascos), mesas de laboratorio con pantallas, pizarra-monitor. `animarSala(t)` hace pulsar líquidos y LEDs. Aquí van los objetos nuevos.
 - `src/agentes.js`: cuerpos de agentes, caminar (`caminarA`, `ruta` por el pasillo z=1.1), entregas de documentos.
 - `src/eventos.js`: bus de eventos + `guionDemo()` (tarea simulada con un rechazo del revisor).
+- `src/red.js`: cliente del backend (`backend/`, ver `docs/BACKEND.md`): manda la idea, consulta el estado y emite eventos al bus.
 - `src/jugador.js`: el visitante. Compu: primera persona con PointerLock (WASD, Shift, T, Esc). VR: stick izq. camina, der. gira 30°. Colisiones con círculos + límites de la sala.
 - `src/latigo.js`: látigo del visitante. Compu: click izquierdo en primera persona. VR: botón de agarre (squeeze). Cuerda = tubo de N segmentos que siguen el ángulo del mango con retraso; chasquido con WebAudio + destello.
 - `src/util.js`: materiales, texto dibujado en canvas (etiquetas, pastillas), `sleep`.

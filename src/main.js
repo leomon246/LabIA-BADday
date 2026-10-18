@@ -6,6 +6,7 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { VISITANTE, construirSala, animarSala, crearEscritorio, crearPizarra, pantallas, dibujarPantalla, dibujarPizarra } from './oficina.js';
 import { agentes, crearAgente, actualizarAgentes } from './agentes.js';
 import { crearBus, guionDemo } from './eventos.js';
+import { crearPresentacion } from './red.js';
 import { crearJugador } from './jugador.js';
 import { crearLatigo } from './latigo.js';
 
@@ -88,7 +89,8 @@ document.getElementById('caminar').addEventListener('click', () => jugador.camin
 // --- panel HTML y bus ---
 const logEl = document.getElementById('log');
 function log(quien, texto) {
-  const li = document.createElement('li'); li.innerHTML = `<b>${quien}:</b> ${texto}`;
+  const li = document.createElement('li'), b = document.createElement('b');
+  b.textContent = quien + ': '; li.append(b, texto);   // textContent: los mensajes del backend no se interpretan como HTML
   logEl.prepend(li); while (logEl.children.length > 7) logEl.lastChild.remove();
 }
 const bus = crearBus(log);
@@ -100,7 +102,19 @@ async function lanzar() {
   btn.textContent = 'Terminado'; corriendo = false;
 }
 btn.addEventListener('click', lanzar);
-addEventListener('keydown', e => { if (e.code === 'KeyT') lanzar(); });   // T lanza la tarea (útil caminando)
+
+// Idea del usuario -> backend -> eventos reales al bus
+const ideaForm = document.getElementById('ideaForm'), ideaIn = document.getElementById('idea'), crear = document.getElementById('crear');
+ideaForm.addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const idea = ideaIn.value.trim();
+  if (!idea || corriendo) return;
+  corriendo = true; crear.disabled = btn.disabled = true;
+  try { const guion = await crearPresentacion(bus, idea); log('Sistema', `Guion listo: ${guion.titulo}`); }
+  catch (err) { log('Error', err.message); }
+  finally { corriendo = false; crear.disabled = btn.disabled = false; }
+});
+addEventListener('keydown', e => { if (e.code === 'KeyT' && !(e.target instanceof HTMLInputElement)) lanzar(); });   // T lanza la tarea (útil caminando)
 document.getElementById('reset').addEventListener('click', () => location.reload());
 
 // --- bucle principal ---

@@ -20,8 +20,12 @@
   <div id="hud">
     <h1>Laboratorio de agentes</h1>
     <p>Caminar: WASD + mouse, Shift corre, T lanza la tarea, Esc sale. En VR: stick izquierdo camina, derecho gira, gatillo lanza la tarea.</p>
+    <form id="ideaForm" class="row idea">
+      <input id="idea" type="text" maxlength="500" placeholder="Una idea: ¿cómo funcionan los agujeros negros?" autocomplete="off">
+      <button class="primary" id="crear" type="submit">Crear presentación</button>
+    </form>
     <div class="row">
-      <button class="primary" id="go">Lanzar tarea de prueba</button>
+      <button id="go">Lanzar tarea de prueba</button>
       <button id="caminar">Caminar</button>
       <button id="reset">Reiniciar</button>
     </div>
