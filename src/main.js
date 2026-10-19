@@ -22,8 +22,8 @@ const EQUIPO_DEMO = false;
 
 // --- escena y render ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xE4EAEC);
-scene.fog = new THREE.Fog(0xE4EAEC, 26, 48);
+scene.background = new THREE.Color(0x1B1F23);
+scene.fog = new THREE.Fog(0x1B1F23, 30, 60);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -43,9 +43,7 @@ camera.position.copy(POSE_ORBITA); rig.add(camera);
 const orbita = new OrbitControls(camera, renderer.domElement);
 orbita.target.set(0, 1.3, -9.5);
 orbita.enableDamping = true; orbita.maxPolarAngle = Math.PI * 0.49;
-orbita.minDistance = 3; orbita.maxDistance = 24;
-
-// Botón "Enter VR" (solo aparece si el navegador soporta VR)
+orbita.minDistance = 3; orbita.maxDistance = 24;// Botón "Enter VR" (solo aparece si el navegador soporta VR)
 if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(ok => {
   if (!ok) return;
   const b = VRButton.createButton(renderer); b.style.position = 'static'; b.style.transform = 'none';

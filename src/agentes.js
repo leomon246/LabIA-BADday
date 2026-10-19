@@ -5,29 +5,58 @@ import { rutaLibre } from './navegacion.js';
 
 export const agentes = {};
 
+// Científicos con bata: piel y pelo varían por personaje; la camisa (visible por la bata abierta) y el gafete llevan su color.
+const PIELES = [0xF1C9A5, 0xD9A47E, 0xB97A57, 0x8D5A3B, 0xF5D6BC];
+const PELOS = [0x2B2420, 0x5A3A22, 0x1A1A1A, 0x8C5A2B, 0xB8B2A8, 0x3B2A1E];
+const BATA = { jefe: 0x2E3438 };   // el jefe va de traje oscuro; los demás, bata blanca
+const H = 0.78;                    // altura de la cadera
+const hashId = s => { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+
 export function crearAgente(scene, id, nombre, color, casa, yaw) {
-  const g = new THREE.Group();
-  const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.27, 0.95, 24), material(color, 0.6));
-  cuerpo.position.y = 0.62; cuerpo.castShadow = true;
-  // La cabeza es un grupo propio para poder girarla hacia quien miran sin girar el cuerpo
-  const cabezaG = new THREE.Group(); cabezaG.position.y = 1.31;
-  const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.17, 24, 16), material(0xF2EEE6, 0.5));
-  cabeza.castShadow = true;
+  const g = new THREE.Group(), h = hashId(id);
+  const piel = material(PIELES[h % PIELES.length], 0.6), pelo = material(PELOS[(h >> 3) % PELOS.length], 0.8);
+  const bataMat = new THREE.MeshStandardMaterial({ color: BATA[id] ?? 0xF4F6F7, roughness: 0.7, side: THREE.DoubleSide });
+  const pantalon = material(0x2A3036, 0.8), zapato = material(0x16191C, 0.5);
+  // Torso (camisa del color del agente) = 'cuerpo', el que respira
+  const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.5, 16), material(color, 0.6));
+  cuerpo.position.y = H + 0.25; cuerpo.castShadow = true;
+  // Bata: cono abierto por delante (theta 0 = +z), del hombro hasta la rodilla
+  const bata = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.27, 0.86, 20, 1, true, 0.32, Math.PI * 2 - 0.64), bataMat);
+  bata.position.y = H + 0.08; bata.castShadow = true;
+  const hombros = new THREE.Mesh(new THREE.SphereGeometry(0.19, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), bataMat);
+  hombros.scale.y = 0.35; hombros.position.y = H + 0.5;
+  const cuello = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.12, 10), piel); cuello.position.y = H + 0.58;
+  // gafete en el pecho: brilla con el color del agente (y con el ánimo, ver eventos.js)
   const visorMat = new THREE.MeshStandardMaterial({ color: 0x1F2A2E, emissive: color, emissiveIntensity: 0.7, roughness: 0.3 });
-  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.06), visorMat); visor.position.set(0, 0.02, 0.14);
-  cabezaG.add(cabeza, visor);
-  // Brazos: un pivote en el hombro; la cápsula cuelga hacia abajo
-  const matBrazo = material(color, 0.6), matMano = material(0xF2EEE6, 0.5);
+  const gafete = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.012), visorMat); gafete.position.set(0.11, H + 0.38, 0.2); gafete.rotation.y = 0.35;
+  // Piernas: pivote en la cadera, pantalón y zapato
+  const piernas = [-1, 1].map(lado => {
+    const p = new THREE.Group(); p.position.set(lado * 0.085, H, 0);
+    const pierna = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.62, 3, 8), pantalon); pierna.position.y = -0.36; pierna.castShadow = true;
+    const pie = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.2), zapato); pie.position.set(0, -H + 0.035, 0.04);
+    p.add(pierna, pie); return p;
+  });
+  // La cabeza es un grupo propio para poder girarla hacia quien miran sin girar el cuerpo
+  const cabezaG = new THREE.Group(); cabezaG.position.y = H + 0.8;
+  const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.17, 24, 16), piel); cabeza.scale.set(0.95, 1.05, 1); cabeza.castShadow = true;
+  const cabello = new THREE.Mesh(new THREE.SphereGeometry(0.178, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), pelo);
+  cabello.rotation.x = -0.35; cabello.position.y = 0.01;
+  const ojoG = new THREE.SphereGeometry(0.02, 8, 6), ojoMat = material(0x15181B, 0.3);
+  const ojos = [-1, 1].map(lado => { const o = new THREE.Mesh(ojoG, ojoMat); o.position.set(lado * 0.058, 0.02, 0.152); return o; });
+  const boca = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.014, 0.02), material(0x6B2E2A, 0.6)); boca.position.set(0, -0.07, 0.15);
+  const nariz = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), piel); nariz.position.set(0, -0.015, 0.165);
+  cabezaG.add(cabeza, cabello, ...ojos, nariz, boca);
+  // Brazos: un pivote en el hombro; la manga cuelga hacia abajo
   const brazos = [-1, 1].map(lado => {
-    const p = new THREE.Group(); p.position.set(lado * 0.27, 1.07, 0);
-    const brazo = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.3, 3, 8), matBrazo); brazo.position.y = -0.2; brazo.castShadow = true;
-    const mano = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), matMano); mano.position.y = -0.42;
+    const p = new THREE.Group(); p.position.set(lado * 0.22, H + 0.44, 0);
+    const brazo = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.3, 3, 8), bataMat); brazo.position.y = -0.2; brazo.castShadow = true;
+    const mano = new THREE.Mesh(new THREE.SphereGeometry(0.048, 12, 8), piel); mano.position.y = -0.42;
     p.add(brazo, mano); return p;
   });
-  const etiqueta = crearEtiqueta(nombre, color); etiqueta.sprite.position.y = 1.86;
-  g.add(cuerpo, cabezaG, ...brazos, etiqueta.sprite);
+  const etiqueta = crearEtiqueta(nombre, color); etiqueta.sprite.position.y = 2.0;
+  g.add(cuerpo, bata, hombros, cuello, gafete, ...piernas, cabezaG, ...brazos, etiqueta.sprite);
   g.position.copy(casa); g.rotation.y = yaw; scene.add(g);
-  agentes[id] = { id, nombre, color, g, cuerpo, cabezaG, brazos, etiqueta, visorMat, casa: casa.clone(), yawCasa: yaw,
+  agentes[id] = { id, nombre, color, g, cuerpo, cabezaG, brazos, piernas, boca, ojos, etiqueta, visorMat, casa: casa.clone(), yawCasa: yaw,
                   camino: [], mirarYaw: yaw, velocidad: 1.6, paso: 0, alLlegar: null, susto: 0,
                   // gestos
                   base: 'idle', temp: null, tempHasta: 0, llevando: false, habla: false, nivelVoz: 0,
@@ -70,7 +99,7 @@ export const fijarMirada = fn => { posJugador = fn; };
 // Pastilla flotante sobre la cabeza ("¡Listo!", "¡Ojo!"…). Una por texto y agente, se reutilizan.
 function insignia(a, texto, seg = 1.8) {
   let s = a.insignias[texto];
-  if (!s) { s = a.insignias[texto] = crearTag(texto, a.color); s.position.y = 2.2; s.visible = false; a.g.add(s); }
+  if (!s) { s = a.insignias[texto] = crearTag(texto, a.color); s.position.y = 2.34; s.visible = false; a.g.add(s); }
   if (a.insigniaActual && a.insigniaActual !== s) a.insigniaActual.visible = false;
   s.visible = true; a.insigniaActual = s; a.insigniaHasta = reloj + seg;
 }
@@ -147,7 +176,14 @@ function actualizarGestos(a, dt, caminando) {
     br.rotation.z += (o.z - br.rotation.z) * k;
     if (i === 0 && !caminando && !a.susto) a.g.position.y = o.hop;   // celebrar = brinquitos
   });
+  a.piernas.forEach((p, i) => {                                         // al caminar, cada pierna va contraria a su brazo
+    const obj = caminando ? Math.sin(a.paso) * 0.5 * (i === 0 ? 1 : -1) : 0;
+    p.rotation.x += (obj - p.rotation.x) * k;
+  });
   a.cuerpo.scale.y = 1 + Math.sin(reloj * 1.8 + a.fase) * 0.012;      // respiración
+  a.boca.scale.y = a.habla ? 1 + a.nivelVoz * 4 : 1;                   // abre la boca con la voz
+  const parpado = (reloj + a.fase * 3) % 4.2 < 0.12 ? 0.1 : 1;          // parpadea cada ~4 s
+  for (const o of a.ojos) o.scale.y = parpado;
 
   // --- hacia dónde mira la cabeza ---
   let objetivo = null;

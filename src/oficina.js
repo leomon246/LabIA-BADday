@@ -11,7 +11,10 @@ export const obstaculosJugador = [];
 const bloquear = (x, z, rJugador, rNav = rJugador) => { obstaculosJugador.push({ x, z, r: rJugador }); registrarObstaculo(x, z, rNav); };
 
 // Dimensiones del lab: paredes en x = ±13, z = -6 (fondo, con la pantalla grande) y z = 11 (frente, detrás del visitante)
-const AN = 13, ZF = -6, ZT = 11, ALTO = 4.2, CZ = (ZF + ZT) / 2, LARGO = ZT - ZF;
+const AN = 13, ZF = -6, ZT = 11, ALTO = 5.6, CZ = (ZF + ZT) / 2, LARGO = ZT - ZF;
+// Estética de cámara de pruebas (estilo Portal): paneles blancos hasta BANDA, metal oscuro arriba, acentos azul y naranja
+const BANDA = 3;
+const AZUL = 0x3FA9F5, NARANJA = 0xFF8A1E;
 
 // Materiales que brillan y se animan en animarSala (líquidos, LEDs)
 const brillos = [];
@@ -19,102 +22,257 @@ const brillo = (color, base = 0.8) => {
   const m = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: base, roughness: 0.3 });
   brillos.push({ m, base, fase: Math.random() * 6.28, vel: 0.8 + Math.random() * 1.6 }); return m;
 };
+const animados = [];   // funciones (t) => {} de la rejilla, etc.
 const vidrio = new THREE.MeshStandardMaterial({ color: 0xD6EEF2, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false });
 const LIQUIDOS = [0x45D6C8, 0x7BE07A, 0xB07CE8, 0xF2B544];
 
-// Textura de canvas que se repite (baldosas del piso, paneles de pared)
-function textura(w, h, rx, ry, dibujar) {
+// Textura de canvas que se repite. Se dibuja una vez; cada superficie usa un clon (comparte la imagen en la GPU).
+function textura(w, h, dibujar) {
   const T = canvasTex(w, h); dibujar(T.ctx, w, h);
-  T.t.wrapS = T.t.wrapT = THREE.RepeatWrapping; T.t.repeat.set(rx, ry); T.t.needsUpdate = true;
-  return T.t;
+  T.t.wrapS = T.t.wrapT = THREE.RepeatWrapping; T.t.needsUpdate = true;
+  return (rx, ry) => { const t = T.t.clone(); t.repeat.set(rx, ry); t.needsUpdate = true; return t; };
 }
-const baldosa = (x, w, h) => {
-  x.fillStyle = '#DCE2E4'; x.fillRect(0, 0, w, h);
-  x.strokeStyle = '#B9C2C6'; x.lineWidth = 3; x.strokeRect(0, 0, w, h);
+// Placas en cuadrícula (n x n por textura), cada una con un tono un poco distinto, bisel de luz y juntas oscuras
+const placas = (n, base, variacion, junta, bisel) => (x, w, h) => {
+  const p = w / n;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const v = Math.round(base + (Math.random() - 0.5) * variacion);
+    x.fillStyle = `rgb(${v},${v + 2},${v + 4})`; x.fillRect(i * p, j * p, p, p);
+    x.fillStyle = bisel; x.fillRect(i * p + 3, j * p + 3, p - 6, 3); x.fillRect(i * p + 3, j * p + 3, 3, p - 6);
+  }
+  x.fillStyle = junta;
+  for (let k = 0; k <= n; k++) { x.fillRect(k * p - 2, 0, 4, h); x.fillRect(0, k * p - 2, w, 4); }
 };
-const panel = (x, w, h) => {
-  x.fillStyle = '#EEF2F3'; x.fillRect(0, 0, w, h);
-  x.fillStyle = '#C8D1D4'; x.fillRect(0, 0, 3, h); x.fillRect(0, h * 0.62, w, 2);   // juntas entre paneles
+// Metal oscuro de la parte alta: costillas verticales cada 0,5 m y remaches
+const metalOscuro = (x, w, h) => {
+  x.fillStyle = '#3A3F44'; x.fillRect(0, 0, w, h);
+  for (let k = 0; k < 4; k++) {
+    const px = k * w / 4;
+    x.fillStyle = '#24282C'; x.fillRect(px, 0, 4, h);
+    x.fillStyle = 'rgba(255,255,255,.07)'; x.fillRect(px + 4, 0, 3, h);
+    x.fillStyle = '#2C3034'; for (const py of [14, h / 2, h - 14]) { x.beginPath(); x.arc(px + 20, py, 3, 0, 6.3); x.fill(); }
+  }
+  x.fillStyle = '#24282C'; x.fillRect(0, h / 2 - 2, w, 4);
 };
 
 export function construirSala(scene) {
-  scene.add(new THREE.HemisphereLight(0xF4FAFF, 0x6F7A80, 2.4));
-  const sol = new THREE.DirectionalLight(0xFFFFFF, 2.6);
-  sol.position.set(-8, 12, 6); sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048);
+  scene.add(new THREE.HemisphereLight(0xF2F6FA, 0x3A4046, 1.7));
+  const sol = new THREE.DirectionalLight(0xFFFFFF, 2.0);
+  sol.position.set(-8, 14, 6); sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048);
   Object.assign(sol.shadow.camera, { left: -17, right: 17, top: 14, bottom: -14, far: 50 });
   sol.target.position.set(0, 0, CZ); scene.add(sol.target);
   scene.add(sol);
 
-  // Piso de baldosas claras (1 m)
-  const piso = new THREE.Mesh(new THREE.PlaneGeometry(2 * AN, LARGO),
-    new THREE.MeshStandardMaterial({ map: textura(128, 128, 2 * AN, LARGO, baldosa), roughness: 0.55 }));
+  // Piso de placas grises de 1 m
+  const texPiso = textura(512, 512, placas(4, 92, 16, '#2A2E32', 'rgba(255,255,255,.07)'));
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(2 * AN, LARGO), new THREE.MeshStandardMaterial({ map: texPiso(2 * AN / 4, LARGO / 4), roughness: 0.6, metalness: 0.1 }));
   piso.rotation.x = -Math.PI / 2; piso.position.z = CZ; piso.receiveShadow = true; scene.add(piso);
   const anillo = (r1, r2, op) => {
-    const m = new THREE.Mesh(new THREE.RingGeometry(r1, r2, 64),
-      new THREE.MeshBasicMaterial({ color: 0x45D6C8, transparent: true, opacity: op }));
+    const m = new THREE.Mesh(new THREE.RingGeometry(r1, r2, 64), new THREE.MeshBasicMaterial({ color: AZUL, transparent: true, opacity: op }));
     m.rotation.x = -Math.PI / 2; m.position.set(0, 0.007, -1.2); scene.add(m);
   };
   anillo(2.5, 2.58, 0.9); anillo(2.25, 2.28, 0.5);
 
-  // Paredes de paneles blancos con zócalo oscuro y una línea de luz arriba (las cuatro)
-  const zocalo = material(0x3C474C, 0.6), luz = new THREE.MeshBasicMaterial({ color: 0x9FEAE2 });
+  // Paredes: paneles blancos abajo, una línea de luz y metal oscuro arriba (las cuatro)
+  const texBlanca = textura(512, 512, placas(4, 228, 18, '#8E959A', 'rgba(255,255,255,.75)'));
+  const texMetal = textura(256, 256, metalOscuro);
+  const zocalo = material(0x2A2E32, 0.6), luz = new THREE.MeshBasicMaterial({ color: 0xF4FAFF });
   const pared = (w, x, z, ry) => {
     const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, ALTO),
-      new THREE.MeshStandardMaterial({ map: textura(128, 256, w / 2, 1, panel), roughness: 0.8 }));
-    m.position.y = ALTO / 2; m.receiveShadow = true;
-    const z0 = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, 0.03), zocalo); z0.position.set(0, 0.09, 0.015);
-    const l = new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, 0.02), luz); l.position.set(0, ALTO - 0.5, 0.01);
-    g.add(m, z0, l); scene.add(g);
+    const blanca = new THREE.Mesh(new THREE.PlaneGeometry(w, BANDA), new THREE.MeshStandardMaterial({ map: texBlanca(w / 4, BANDA / 4), roughness: 0.75 }));
+    blanca.position.y = BANDA / 2; blanca.receiveShadow = true;
+    const alta = new THREE.Mesh(new THREE.PlaneGeometry(w, ALTO - BANDA), new THREE.MeshStandardMaterial({ map: texMetal(w / 2, 1), roughness: 0.55, metalness: 0.3 }));
+    alta.position.y = BANDA + (ALTO - BANDA) / 2;
+    const z0 = new THREE.Mesh(new THREE.BoxGeometry(w, 0.14, 0.04), zocalo); z0.position.set(0, 0.07, 0.02);
+    const repisa = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, 0.14), zocalo); repisa.position.set(0, BANDA + 0.06, 0.07);
+    const l = new THREE.Mesh(new THREE.BoxGeometry(w, 0.035, 0.02), luz); l.position.set(0, BANDA - 0.02, 0.15);
+    g.add(blanca, alta, z0, repisa, l); scene.add(g);
   };
   pared(2 * AN, 0, ZF, 0);                 // fondo (la pantalla grande)
-  pared(2 * AN, 0, ZT, Math.PI);           // frente (detrás de quien llega): la que faltaba
+  pared(2 * AN, 0, ZT, Math.PI);           // frente (detrás de quien llega)
   pared(LARGO, -AN, CZ, Math.PI / 2);      // izquierda
   pared(LARGO, AN, CZ, -Math.PI / 2);      // derecha
 
-  // Techo con paneles de luz (visto desde arriba no se dibuja: se ve el lab por encima)
-  const techo = new THREE.Mesh(new THREE.PlaneGeometry(2 * AN, LARGO), new THREE.MeshBasicMaterial({ color: 0xD3DADD }));
+  // Techo oscuro con tiras de luz (visto desde arriba no se dibuja: se ve el lab por encima)
+  const texTecho = textura(256, 256, placas(4, 50, 8, '#1C1F22', 'rgba(255,255,255,.04)'));
+  const techo = new THREE.Mesh(new THREE.PlaneGeometry(2 * AN, LARGO), new THREE.MeshBasicMaterial({ map: texTecho(2 * AN / 4, LARGO / 4) }));
   techo.rotation.x = Math.PI / 2; techo.position.set(0, ALTO, CZ); scene.add(techo);
-  const panelLuz = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
-  for (let i = -2; i <= 2; i++) for (let j = 0; j < 3; j++) {
-    const p = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.05, 0.5), panelLuz); p.position.set(i * 5, ALTO - 0.02, ZF + 3 + j * 6); scene.add(p);
+  const panelLuz = new THREE.MeshBasicMaterial({ color: 0xFFFFFF }), carcasa = material(0x1E2226, 0.5);
+  const tiraG = new THREE.BoxGeometry(4.2, 0.05, 0.28), carcasaG = new THREE.BoxGeometry(4.4, 0.1, 0.42);
+  for (let i = -2; i <= 2; i++) for (let j = 0; j < 4; j++) {
+    const c = new THREE.Mesh(carcasaG, carcasa); c.position.set(i * 5, ALTO - 0.05, ZF + 2 + j * 4.3);
+    const p = new THREE.Mesh(tiraG, panelLuz); p.position.set(i * 5, ALTO - 0.1, ZF + 2 + j * 4.3); scene.add(c, p);
   }
 
-  // Ventanales de observación (paredes izquierda y derecha)
-  const marcoMat = material(0x55605F, 0.4);
-  for (const lado of [-1, 1]) for (let i = 0; i < 4; i++) {
-    const g = new THREE.Group(); g.position.set(lado * (AN - 0.03), 2.1, -3.2 + i * 4.2); g.rotation.y = -lado * Math.PI / 2;
-    const cristal = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.8), new THREE.MeshBasicMaterial({ color: 0xBFD9E2 }));
-    const marco = new THREE.Mesh(new THREE.BoxGeometry(2.56, 1.96, 0.04), marcoMat); marco.position.z = -0.025;
-    const travesano = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.8, 0.03), marcoMat); travesano.position.z = 0.01;
-    g.add(marco, cristal, travesano); scene.add(g);
+  // Ventanas de observación en lo alto de las paredes laterales (la sala de control "vigila" el lab)
+  const texVentana = ventanaObservacion();
+  const marcoMat = material(0x1E2226, 0.4);
+  for (const lado of [-1, 1]) for (const vz of [-2.6, 3.6, 8.4]) {
+    const g = new THREE.Group(); g.position.set(lado * (AN - 0.03), 4.15, vz); g.rotation.y = -lado * Math.PI / 2;
+    const cristal = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.0), new THREE.MeshBasicMaterial({ map: texVentana }));
+    const marco = new THREE.Mesh(new THREE.BoxGeometry(3.44, 1.24, 0.08), marcoMat); marco.position.z = -0.03;
+    g.add(marco, cristal);
+    for (const tx of [-0.8, 0.8]) { const t = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.0, 0.03), marcoMat); t.position.set(tx, 0, 0.015); g.add(t); }
+    scene.add(g);
   }
 
-  // Letrero del laboratorio en la pared del frente
-  const L = canvasTex(1024, 256), x = L.ctx;
-  x.fillStyle = '#17262B'; rr(x, 0, 0, 1024, 256, 40); x.fill();
-  x.fillStyle = '#45D6C8'; x.fillRect(48, 112, 90, 8);
-  x.fillStyle = '#E6F4F2'; x.font = `600 84px ${FONT}`; x.fillText('Laboratorio de agentes', 48, 100);
-  x.fillStyle = '#8FB3B0'; x.font = `400 44px ${FONT}`; x.fillText('Be a Dragon · USFQ', 48, 190); L.t.needsUpdate = true;
-  const letrero = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.25), new THREE.MeshBasicMaterial({ map: L.t }));
-  letrero.position.set(0, 2.6, ZT - 0.03); letrero.rotation.y = Math.PI; scene.add(letrero);
+  // Tubos neumáticos de vidrio que recorren lo alto de las paredes laterales
+  const soporteG = new THREE.CylinderGeometry(0.15, 0.15, 0.08, 14);
+  for (const lado of [-1, 1]) {
+    const tubo = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, LARGO - 0.4, 14, 1, true), vidrio);
+    tubo.rotation.x = Math.PI / 2; tubo.position.set(lado * (AN - 0.35), 5.05, CZ); scene.add(tubo);
+    for (let k = 0; k < 6; k++) { const s = new THREE.Mesh(soporteG, carcasa); s.rotation.x = Math.PI / 2; s.position.set(lado * (AN - 0.35), 5.05, ZF + 0.8 + k * 3.1); scene.add(s); }
+  }
+
+  // Letrero en la pared del frente, salida con rejilla de emancipación y el botón con su cubo
+  letreroFrente(scene);
+  crearSalida(scene, 9.2);
+  crearBoton(scene, 0, 9.7, 9.2 - 1.15);
+  crearCubo(scene, -6.5, 10.1, 0.4);
+  crearCubo(scene, -11.6, 7.4, -0.2);
+  letreroCamara(scene, 7.0, ZF + 0.02);
 
   // Equipos: tanques en las esquinas del fondo y racks en las del frente
   crearTanque(scene, -AN + 1, ZF + 0.8, LIQUIDOS[0]);
   crearTanque(scene, AN - 1, ZF + 0.8, LIQUIDOS[2]);
   crearRack(scene, -AN + 0.8, ZT - 1.2);
   crearRack(scene, AN - 0.8, ZT - 1.2);
-  // Mesas de trabajo largas y plantas, para que el lab no sea un salón vacío
+  // Mesas de trabajo largas, para que el lab no sea un salón vacío
   crearIsla(scene, -4.8, 8.4); crearIsla(scene, 4.8, 8.4);
-  [[-AN + 0.7, 4.6], [AN - 0.7, 4.6], [-AN + 0.7, -1.0], [AN - 0.7, -1.0], [-6.5, ZT - 0.7], [6.5, ZT - 0.7], [0, ZT - 0.7]].forEach(([px, pz]) => crearPlanta(scene, px, pz));
 
   // Repisas con frascos en las paredes laterales (arriba de la cabeza)
-  const repisaMat = material(0xCFD6D9, 0.5);
+  const repisaMat = material(0x3A3F44, 0.45);
   for (const lado of [-1, 1]) [1.95, 2.45].forEach((y, n) => {
     const r = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 4), repisaMat);
     r.position.set(lado * (AN - 0.15), y, 6.6); r.castShadow = true; scene.add(r);
     for (let k = 0; k < 7; k++) frasco(scene, lado * (AN - 0.15), y + 0.015, 4.9 + k * 0.55 + Math.random() * 0.15, LIQUIDOS[(k + n) % 4], k % 2);
   });
+}
+
+// Vidrio oscuro de la sala de observación: luz cálida adentro, siluetas de monitores y un reflejo
+function ventanaObservacion() {
+  const T = canvasTex(256, 80), c = T.ctx;
+  const g = c.createLinearGradient(0, 0, 0, 80); g.addColorStop(0, '#8FB0C2'); g.addColorStop(0.5, '#4E6878'); g.addColorStop(1, '#22313B');
+  c.fillStyle = g; c.fillRect(0, 0, 256, 80);
+  c.fillStyle = '#FFE2B0'; c.fillRect(0, 3, 256, 5);
+  c.fillStyle = '#0D1418'; for (let i = 0; i < 5; i++) c.fillRect(14 + i * 50, 46, 30, 20);
+  c.fillStyle = '#7FD3FF'; for (let i = 0; i < 5; i++) c.fillRect(17 + i * 50, 49, 24, 13);
+  c.fillStyle = 'rgba(255,255,255,.10)'; c.beginPath(); c.moveTo(60, 0); c.lineTo(110, 0); c.lineTo(60, 80); c.lineTo(10, 80); c.fill();
+  T.t.needsUpdate = true; return T.t;
+}
+
+// Logo de diafragma (8 hojas): un círculo con un hueco octagonal y cortes en espiral
+function diafragma(r, color) {
+  const T = document.createElement('canvas'); T.width = T.height = r * 2 + 4;
+  const c = T.getContext('2d'); c.translate(r + 2, r + 2);
+  c.fillStyle = color; c.beginPath(); c.arc(0, 0, r, 0, 6.3); c.fill();
+  c.globalCompositeOperation = 'destination-out';
+  c.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; c.lineTo(Math.cos(a) * r * 0.36, Math.sin(a) * r * 0.36); } c.fill();
+  c.lineWidth = r * 0.07;
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4, px = Math.cos(a) * r * 0.36, py = Math.sin(a) * r * 0.36, d = a + 1.15;
+    c.beginPath(); c.moveTo(px, py); c.lineTo(px + Math.cos(d) * r * 1.3, py + Math.sin(d) * r * 1.3); c.stroke();
+  }
+  return T;
+}
+
+// Letrero del laboratorio en la pared del frente (estilo señalética de cámara de pruebas)
+function letreroFrente(scene) {
+  const L = canvasTex(1024, 320), x = L.ctx;
+  x.fillStyle = '#ECEDE8'; x.fillRect(0, 0, 1024, 320);
+  x.drawImage(diafragma(110, '#1E2226'), 36, 46);
+  x.fillStyle = '#1E2226'; x.font = `600 82px ${FONT}`; x.fillText('Laboratorio de agentes', 290, 140);
+  x.fillStyle = '#5A6166'; x.font = `400 44px ${FONT}`; x.fillText('Be a Dragon · USFQ', 292, 210);
+  x.fillStyle = '#' + new THREE.Color(NARANJA).getHexString(); x.fillRect(292, 238, 220, 10);
+  x.fillStyle = '#' + new THREE.Color(AZUL).getHexString(); x.fillRect(520, 238, 220, 10);
+  L.t.needsUpdate = true;
+  const letrero = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.625), new THREE.MeshBasicMaterial({ map: L.t }));
+  letrero.position.set(0, 3.95, ZT - 0.04); letrero.rotation.y = Math.PI; scene.add(letrero);
+}
+
+// Letrero vertical de "cámara de pruebas": número grande, barra de progreso y pictogramas
+function letreroCamara(scene, x, z) {
+  const T = canvasTex(256, 512), c = T.ctx;
+  c.fillStyle = '#ECEDE8'; c.fillRect(0, 0, 256, 512);
+  c.fillStyle = '#1E2226'; c.font = `300 170px ${FONT}`; c.fillText('01', 18, 160);
+  c.fillRect(20, 184, 216, 3);
+  c.font = `600 22px ${FONT}`; c.fillText('Sala de agentes', 20, 222);
+  for (let i = 0; i < 10; i++) { c.fillStyle = i < 6 ? '#1E2226' : '#C3C6C2'; c.fillRect(20 + i * 22, 240, 16, 8); }
+  const glifos = [
+    k => { k.fillRect(-10, -10, 20, 20); },                                                           // cubo
+    k => { k.beginPath(); k.arc(0, -10, 5, 0, 6.3); k.fill(); k.fillRect(-4, -4, 8, 16); },              // persona
+    k => { k.beginPath(); k.arc(0, 0, 11, 0, 6.3); k.fill(); },                                         // esfera
+    k => { k.beginPath(); k.moveTo(-10, 8); k.lineTo(0, -10); k.lineTo(10, 8); k.fill(); },             // peligro
+    k => { k.fillRect(-11, -2, 16, 4); k.beginPath(); k.moveTo(3, -8); k.lineTo(12, 0); k.lineTo(3, 8); k.fill(); },   // avance
+    k => { k.fillRect(-8, -11, 16, 22); },                                                            // documento
+  ];
+  for (let i = 0; i < 6; i++) {
+    const px = 20 + (i % 3) * 76, py = 280 + Math.floor(i / 3) * 76, on = i !== 3;
+    c.fillStyle = on ? '#1E2226' : '#C3C6C2'; c.fillRect(px, py, 64, 64);
+    c.save(); c.translate(px + 32, py + 32); c.fillStyle = on ? '#ECEDE8' : '#8E9290'; glifos[i](c); c.restore();
+  }
+  T.t.needsUpdate = true;
+  const marco = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.7, 0.06), material(0x1E2226, 0.5)); marco.position.set(x, 1.6, z + 0.03);
+  const cara = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 2.6), new THREE.MeshBasicMaterial({ map: T.t })); cara.position.set(x, 1.6, z + 0.065);
+  scene.add(marco, cara);
+}
+
+// Puerta de salida en la pared del frente con su rejilla de emancipación (cortina azul que titila)
+function crearSalida(scene, x) {
+  const z = ZT - 0.03, W = 2.2, H = 3.0, oscuro = material(0x1E2226, 0.5);
+  const hueco = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ color: 0x0C0F12 }));
+  hueco.position.set(x, H / 2, z); hueco.rotation.y = Math.PI;
+  const dintel = new THREE.Mesh(new THREE.BoxGeometry(W + 0.5, 0.25, 0.3), oscuro); dintel.position.set(x, H + 0.12, z - 0.12);
+  scene.add(hueco, dintel);
+  const tiraLuz = new THREE.MeshBasicMaterial({ color: AZUL });
+  for (const s of [-1, 1]) {
+    const poste = new THREE.Mesh(new THREE.BoxGeometry(0.25, H, 0.3), oscuro); poste.position.set(x + s * (W / 2 + 0.12), H / 2, z - 0.12);
+    const tira = new THREE.Mesh(new THREE.BoxGeometry(0.04, H - 0.3, 0.02), tiraLuz); tira.position.set(x + s * (W / 2 - 0.005), H / 2, z - 0.28);
+    scene.add(poste, tira);
+  }
+  const T = canvasTex(64, 256), c = T.ctx;
+  for (let i = 0; i < 64; i += 2) { c.fillStyle = `rgba(120,200,255,${(0.15 + Math.random() * 0.5).toFixed(2)})`; c.fillRect(i, 0, 1 + Math.random() * 2, 256); }
+  T.t.wrapS = T.t.wrapT = THREE.RepeatWrapping; T.t.repeat.set(3, 1); T.t.needsUpdate = true;
+  const rejilla = new THREE.Mesh(new THREE.PlaneGeometry(W, H - 0.1), new THREE.MeshBasicMaterial({ map: T.t, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  rejilla.position.set(x, H / 2, z - 0.2); scene.add(rejilla);
+  animados.push(t => { T.t.offset.x = t * 0.08; T.t.offset.y = t * 0.3; rejilla.material.opacity = 0.5 + 0.12 * Math.sin(t * 9) * Math.sin(t * 2.1); });
+}
+
+// Cubo de compañía: gris con esquinas reforzadas y un corazón rosa en cada cara
+let texCubo = null;
+function crearCubo(scene, x, z, ry = 0, y = 0) {
+  if (!texCubo) {
+    const T = canvasTex(256, 256), c = T.ctx;
+    c.fillStyle = '#8C9398'; c.fillRect(0, 0, 256, 256);
+    c.strokeStyle = '#5C6368'; c.lineWidth = 20; c.strokeRect(10, 10, 236, 236);
+    c.fillStyle = '#C8CDD0';
+    for (const [px, py] of [[0, 0], [176, 0], [0, 176], [176, 176]]) c.fillRect(px, py, 80, 80);
+    c.fillStyle = '#5C6368'; for (const [px, py] of [[24, 24], [192, 24], [24, 192], [192, 192]]) c.fillRect(px, py, 40, 40);
+    c.fillStyle = '#C8CDD0'; c.beginPath(); c.arc(128, 128, 56, 0, 6.3); c.fill();
+    c.fillStyle = '#5C6368'; c.beginPath(); c.arc(128, 128, 44, 0, 6.3); c.fill();
+    c.fillStyle = '#F07AB4'; c.beginPath(); c.moveTo(128, 154);
+    c.bezierCurveTo(96, 132, 100, 102, 120, 106); c.bezierCurveTo(126, 107, 128, 114, 128, 116);
+    c.bezierCurveTo(128, 114, 130, 107, 136, 106); c.bezierCurveTo(156, 102, 160, 132, 128, 154); c.fill();
+    T.t.needsUpdate = true; texCubo = new THREE.MeshStandardMaterial({ map: T.t, roughness: 0.5, metalness: 0.2 });
+  }
+  const cubo = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), texCubo);
+  cubo.position.set(x, y + 0.3, z); cubo.rotation.y = ry; cubo.castShadow = cubo.receiveShadow = true; scene.add(cubo);
+  if (!y) bloquear(x, z, 0.5, 0.45);
+  return cubo;
+}
+
+// Botón grande de piso con un cubo encima y la fila de puntos que lo conecta con la salida (encendidos = naranja)
+function crearBoton(scene, x, z, xFin) {
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.75, 0.1, 32), material(0x3A3F44, 0.5)); base.position.set(x, 0.05, z);
+  const aro = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.04, 32), material(0xD9DCDD, 0.4)); aro.position.set(x, 0.11, z);
+  const disco = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.52, 0.06, 32), brillo(0xE0442C, 0.35)); disco.position.set(x, 0.13, z);
+  base.receiveShadow = aro.receiveShadow = true; scene.add(base, aro, disco);
+  crearCubo(scene, x, z, 0.25, 0.16);
+  bloquear(x, z, 0.85, 0.8);
+  const n = Math.floor((xFin - x - 0.9) / 0.35), punto = new THREE.CircleGeometry(0.06, 12), mat = brillo(NARANJA, 1.0);
+  const fila = new THREE.InstancedMesh(punto, mat, n), m = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)), uno = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < n; i++) fila.setMatrixAt(i, m.compose(new THREE.Vector3(x + 0.9 + i * 0.35, 0.008, ZT - 0.35), q, uno));
+  scene.add(fila);
 }
 
 // Geometrías compartidas de la cristalería
@@ -139,7 +297,7 @@ function crearTanque(scene, x, z, color) {
   const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.15, 24), brillo(color, 0.9)); liq.position.y = 0.74;
   const cas = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 1.5, 24, 1, true), vidrio); cas.position.y = 0.91;
   const tapa = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.14, 24), metal); tapa.position.y = 1.72;
-  const tubo = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 8), metal); tubo.position.y = 2.9;
+  const tubo = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, ALTO - 1.79, 8), metal); tubo.position.y = (ALTO + 1.79) / 2;   // sube hasta el techo
   base.castShadow = tapa.castShadow = true;
   g.add(base, liq, cas, tapa, tubo); scene.add(g);
   bloquear(x, z, 0.5);
@@ -167,25 +325,17 @@ function crearIsla(scene, x, z) {
   const g = new THREE.Group(); g.position.set(x, 0, z);
   const tablero = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.06, 1.0), material(0xF1F4F5, 0.35)); tablero.position.y = 0.95; tablero.castShadow = tablero.receiveShadow = true;
   const cuerpo = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.9, 0.85), material(0x3C474C, 0.55)); cuerpo.position.y = 0.45; cuerpo.castShadow = true;
-  const borde = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.012, 0.012), new THREE.MeshBasicMaterial({ color: 0x45D6C8 })); borde.position.set(0, 0.92, 0.5);
+  const borde = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.012, 0.012), new THREE.MeshBasicMaterial({ color: NARANJA })); borde.position.set(0, 0.92, 0.5);
   g.add(tablero, cuerpo, borde);
   for (let k = 0; k < 5; k++) frasco(g, -1.3 + k * 0.65 + Math.random() * 0.1, 0.98, (k % 2 ? 0.12 : -0.12), LIQUIDOS[k % 4], k % 2);
   scene.add(g);
   for (const dx of [-1.2, 0, 1.2]) bloquear(x + dx, z, 0.75, 0.62);
 }
 
-function crearPlanta(scene, x, z) {
-  const g = new THREE.Group(); g.position.set(x, 0, z);
-  const maceta = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.4, 14), material(0xB9C2C6, 0.7)); maceta.position.y = 0.2; maceta.castShadow = true;
-  const hojas = material(0x3E9E5A, 0.8);
-  g.add(maceta);
-  [[0, 0.75, 0, 0.3], [0.14, 1.0, 0.05, 0.22], [-0.12, 0.95, -0.06, 0.24]].forEach(([px, py, pz, r]) => { const h = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), hojas); h.position.set(px, py, pz); h.castShadow = true; g.add(h); });
-  scene.add(g); bloquear(x, z, 0.4, 0.3);
-}
-
-// Pulso suave de líquidos y LEDs. Llamar en cada cuadro con el tiempo en segundos.
+// Pulso suave de líquidos y LEDs y rejilla. Llamar en cada cuadro con el tiempo en segundos.
 export function animarSala(t) {
   for (const b of brillos) b.m.emissiveIntensity = b.base * (0.65 + 0.35 * Math.sin(t * b.vel + b.fase));
+  for (const f of animados) f(t);
 }
 
 // --- estaciones de trabajo: una mesa por personaje, con objetos propios de su oficio ---
@@ -254,7 +404,7 @@ export function crearEscritorio(scene, id, x, z, tipo = null, colorZona = 0x45D6
   const orilla = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 0.05), new THREE.MeshBasicMaterial({ color: colorZona })); orilla.rotation.x = -Math.PI / 2; orilla.position.set(0, 0.006, 1.85); g.add(orilla);
   const tablero = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.05, 0.8), material(0xF1F4F5, 0.35));
   tablero.position.y = 1.0; tablero.castShadow = tablero.receiveShadow = true; g.add(tablero);
-  const borde = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.012, 0.012), new THREE.MeshBasicMaterial({ color: 0x45D6C8 }));
+  const borde = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.012, 0.012), new THREE.MeshBasicMaterial({ color: AZUL }));
   borde.position.set(0, 0.97, 0.4); g.add(borde);
   // gabinete a la derecha, patas a la izquierda (espacio para las piernas)
   const gabinete = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.95, 0.72), material(0x3C474C, 0.55));
@@ -301,7 +451,7 @@ export function crearEscenario(scene, x, z) {
   const marca = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.95), new THREE.MeshBasicMaterial({ map: T.t })); marca.rotation.x = -Math.PI / 2; marca.position.set(x, 0.008, z); scene.add(marca);
   const atril = new THREE.Group(); atril.position.set(x + 1.05, 0, z - 0.35);
   const cuerpo = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.95, 0.4), material(0x2A3335, 0.5)); cuerpo.position.y = 0.475; cuerpo.castShadow = true;
-  const tapa = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.04, 0.48), material(0x45D6C8, 0.4)); tapa.position.y = 0.97; tapa.rotation.x = 0.25;
+  const tapa = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.04, 0.48), material(AZUL, 0.4)); tapa.position.y = 0.97; tapa.rotation.x = 0.25;
   atril.add(cuerpo, tapa); scene.add(atril); bloquear(x + 1.05, z - 0.35, 0.55, 0.45);
 }
 
@@ -325,11 +475,11 @@ const ACENTO = '#45D6C8', TINTA = '#E6F4F2', SUAVE = '#8FB3B0';
 export function crearPizarra(scene) {
   P = canvasTex(2048, 1120); P.ctx.scale(2, 2);
   const tablero = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshBasicMaterial({ map: P.t }));
-  tablero.position.set(0, PY, -5.95); scene.add(tablero); pizarra = tablero;
+  tablero.position.set(0, PY, -5.78); scene.add(tablero); pizarra = tablero;
   const marco = new THREE.Mesh(new THREE.BoxGeometry(PW + 0.16, PH + 0.16, 0.05), material(0x2A3335, 0.4));
-  marco.position.set(0, PY, -5.99); scene.add(marco);
-  const halo = new THREE.Mesh(new THREE.PlaneGeometry(PW + 0.3, PH + 0.3), new THREE.MeshBasicMaterial({ color: 0x45D6C8 }));
-  halo.position.set(0, PY, -5.995); scene.add(halo);
+  marco.position.set(0, PY, -5.82); scene.add(marco);
+  const halo = new THREE.Mesh(new THREE.PlaneGeometry(PW + 0.3, PH + 0.3), new THREE.MeshBasicMaterial({ color: AZUL }));
+  halo.position.set(0, PY, -5.825); scene.add(halo);
   dibujarPizarra('Sin tareas', []);
 }
 
