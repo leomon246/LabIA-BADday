@@ -4,7 +4,8 @@
 
 Reemplaza a `python -m http.server 8000`: sirve los mismos archivos y además:
     GET  /api/agentes   lista de agentes disponibles
-    POST /api/preguntar {"tema": "..."}   el flujo completo: jefe -> investigador -> presentador
+    GET  /api/config    qué claves hay configuradas (sí/no, sin valores)
+    POST /api/preguntar {"tema": "..."}   el flujo completo: jefe -> investigador -> presentador -> locutor (voz)
     POST /api/ejecutar  {"agente": "presentador", "entrada": "tema"}  corre un solo agente en segundo plano
     GET  /api/eventos   flujo en vivo (Server-Sent Events) con los eventos de los agentes;
                         el navegador los pasa tal cual a bus.emitir()
@@ -41,12 +42,22 @@ def difundir(evento: dict):
             q.put(texto)
 
 
+def aviso_de(err) -> str:
+    """Texto corto para la etiqueta del agente según el tipo de fallo."""
+    m = str(err)
+    if "401" in m or "API key" in m or "UNAUTHENTICATED" in m:
+        return "Clave de API inválida (revisa .env)"
+    if "503" in m or "429" in m:
+        return "Gemini saturado, intenta otra vez"
+    return "Falló, mira la terminal"
+
+
 def correr_agente(nombre: str, entrada: str):
     try:
         AGENTES[nombre].ejecutar(entrada, emitir=difundir)
     except Exception as err:
         print(f"[{nombre}] falló: {err}")
-        aviso = "Gemini saturado, intenta otra vez" if "503" in str(err) or "429" in str(err) else "Falló, mira la terminal"
+        aviso = aviso_de(err)
         difundir({"tipo": "estado", "agente": nombre, "texto": aviso, "animo": "alert"})
     finally:
         ocupados.discard(nombre)
@@ -68,14 +79,30 @@ def investigar_y_presentar(tema: str):
         except Exception as err:
             print(f"[investigador] falló: {err}")
             difundir({"tipo": "estado", "agente": "investigador", "texto": "No pude investigar", "animo": "alert"})
-        AGENTES["presentador"].ejecutar(material, emitir=difundir)
+        ruta_html = AGENTES["presentador"].ejecutar(material, emitir=difundir)
+        difundir({"tipo": "estado", "agente": "jefe", "texto": "Diapositivas listas", "animo": "ok"})
+        if "locutor" in AGENTES:   # la voz es un paso aparte: si falla, la presentación sigue (voz del navegador)
+            try:   # en la escena es el Presentador quien "ensaya" (el locutor no tiene personaje)
+                AGENTES["locutor"].ejecutar(str(Path(ruta_html).with_suffix(".json")), emitir=difundir)
+            except Exception as err:
+                print(f"[locutor] falló: {err}")
+                difundir({"tipo": "estado", "agente": "presentador", "texto": "Sin voz IA: usaré la del navegador", "animo": "alert", "fase": "voz"})
         difundir({"tipo": "estado", "agente": "jefe", "texto": "Presentación lista", "animo": "ok"})
     except Exception as err:
         print(f"[flujo] falló: {err}")
-        aviso = "Gemini saturado, intenta otra vez" if "503" in str(err) or "429" in str(err) else "Falló, mira la terminal"
+        aviso = aviso_de(err)
         difundir({"tipo": "estado", "agente": "presentador", "texto": aviso, "animo": "alert"})
     finally:
         ocupados.discard("flujo")
+
+
+def estado_config() -> dict:
+    """Qué claves hay configuradas (solo sí/no: nunca se envía el valor)."""
+    env = os.environ
+    return {"claves": {"guion": bool(env.get("GEMINI_API_KEY_GUION") or env.get("GEMINI_API_KEY")),
+                       "diapositivas": bool(env.get("GEMINI_API_KEY")),
+                       "voz": bool(env.get("GEMINI_API_KEY_VOZ") or env.get("GEMINI_API_KEY"))},
+            "agentes": sorted(AGENTES)}
 
 
 class Manejador(SimpleHTTPRequestHandler):
@@ -97,6 +124,8 @@ class Manejador(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/agentes":
             return self.responder_json(200, [{"nombre": n, "descripcion": m.DESCRIPCION} for n, m in AGENTES.items()])
+        if self.path == "/api/config":
+            return self.responder_json(200, estado_config())
         if self.path == "/api/eventos":
             return self.flujo_eventos()
         if self.path in ("/", "/index.html"):

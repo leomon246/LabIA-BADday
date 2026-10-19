@@ -32,8 +32,10 @@ def _post_json(url: str, cuerpo: dict, cabeceras: dict, timeout: float, quien: s
         if e.code in (401, 403):
             raise ErrorConfiguracion(f"{quien}: credenciales rechazadas (HTTP {e.code}). {detalle}") from e
         if e.code == 429:
-            raise ErrorProveedor(f"{quien}: cuota o límite de peticiones agotado (HTTP 429). {detalle}") from e
-        raise ErrorProveedor(f"{quien}: HTTP {e.code}. {detalle}") from e
+            err = ErrorProveedor(f"{quien}: cuota o límite de peticiones agotado (HTTP 429). {detalle}"); err.codigo = 429
+            raise err from e
+        err = ErrorProveedor(f"{quien}: HTTP {e.code}. {detalle}"); err.codigo = e.code
+        raise err from e
     except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as e:
         raise ErrorConectividad(f"{quien}: no se pudo conectar ({e})") from e
     except json.JSONDecodeError as e:
@@ -54,13 +56,25 @@ def _parsear_json(texto: str, quien: str) -> dict:
 class Gemini(ProveedorLLM):
     nombre = "gemini"
 
-    def __init__(self, api_key: str, modelo: str, timeout: float = 90):
+    def __init__(self, api_key: str, modelo: str, timeout: float = 75, respaldos: tuple = ()):
         if not api_key:
             raise ErrorConfiguracion("Falta GEMINI_API_KEY (ver .env.example)")
-        self.api_key, self.modelo, self.timeout = api_key, modelo, timeout
+        self.api_key, self.modelo, self.timeout, self.respaldos = api_key, modelo, timeout, tuple(respaldos)
 
     def generar_json(self, sistema, usuario, esquema):
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.modelo}:generateContent"
+        """Si el modelo está saturado (503) o sin cuota (429), prueba los de respaldo en orden."""
+        ultimo = None
+        for modelo in (self.modelo, *self.respaldos):
+            try:
+                return self._generar(modelo, sistema, usuario, esquema)
+            except (ErrorProveedor, ErrorConectividad) as e:
+                if isinstance(e, ErrorProveedor) and getattr(e, "codigo", None) not in (429, 500, 503, 404):
+                    raise
+                ultimo = e          # saturado, sin cuota, sin modelo o timeout: siguiente modelo
+        raise ultimo
+
+    def _generar(self, modelo, sistema, usuario, esquema):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
         cuerpo = {
             "systemInstruction": {"parts": [{"text": sistema}]},
             "contents": [{"role": "user", "parts": [{"text": usuario}]}],
@@ -101,7 +115,8 @@ class Ollama(ProveedorLLM):
 
 def crear_proveedor(nombre: str, env=os.environ) -> ProveedorLLM:
     if nombre == "gemini":
-        return Gemini(env.get("GEMINI_API_KEY", ""), env.get("GEMINI_MODEL", "gemini-2.5-flash"))
+        respaldos = tuple(m.strip() for m in env.get("GEMINI_MODEL_RESPALDO", "gemini-3-flash-preview,gemini-3.1-flash-lite").split(",") if m.strip())
+        return Gemini(env.get("GEMINI_API_KEY", ""), env.get("GEMINI_MODEL", "gemini-2.5-flash").strip(), timeout=float(env.get("GEMINI_TIMEOUT_S", "50")), respaldos=respaldos)
     if nombre == "ollama":
         return Ollama(env.get("OLLAMA_HOST", "http://localhost:11434"), env.get("OLLAMA_MODEL", ""))
     raise ErrorConfiguracion(f"Proveedor LLM desconocido: '{nombre}' (usa gemini u ollama)")

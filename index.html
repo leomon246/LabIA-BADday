@@ -18,8 +18,12 @@
 <body>
 <div id="app">
   <div id="hud">
-    <h1>Laboratorio de agentes</h1>
-    <p>Caminar: WASD + mouse, Shift corre, click = látigo, Esc sale. Para pasar diapositivas: flechas, o un latigazo al Presentador. En VR: stick izquierdo camina, derecho gira, agarre = látigo, gatillo apuntando al monitor grande pasa diapositivas.</p>
+    <header>
+      <span class="punto" aria-hidden="true"></span>
+      <h1>Laboratorio de agentes</h1>
+      <button id="plegar" class="icono" title="Ocultar o mostrar el panel (H)" aria-label="Ocultar panel">–</button>
+    </header>
+    <p class="ayuda">Caminar: WASD + mouse, Shift corre, Esc sale. Flechas ← → pasan diapositivas, Espacio pausa la narración. En VR: stick izquierdo camina, derecho gira, gatillo apuntando al monitor grande pasa diapositivas.</p>
     <div class="row">
       <button id="go">Lanzar tarea de prueba</button>
       <button id="caminar">Caminar</button>
@@ -29,7 +33,20 @@
       <label for="tema">¿Sobre qué quieres aprender?</label>
       <div class="row"><input id="tema" maxlength="500" placeholder="¿Cómo funcionan los agujeros negros?" autocomplete="off"><button class="primary" id="preguntar" type="submit" disabled>Preguntar</button></div>
       <small id="servidor">Buscando servidor de agentes…</small>
+      <div id="claves" class="chips" aria-label="Claves configuradas"></div>
     </form>
+    <ol id="pasos" aria-label="Progreso">
+      <li data-paso="0">Pregunta</li><li data-paso="1">Investiga</li><li data-paso="2">Diapositivas</li><li data-paso="3">Voz</li><li data-paso="4">Listo</li>
+    </ol>
+    <div id="controles" hidden>
+      <div class="row">
+        <button id="anterior" title="Diapositiva anterior (←)" aria-label="Anterior">◀</button>
+        <button class="primary" id="presentar" title="Presenta con narración, avanzando sola">▶ Presentar</button>
+        <button id="pausa" title="Pausar o reanudar la narración (Espacio)" aria-label="Pausa" disabled>⏸</button>
+        <button id="siguiente" title="Diapositiva siguiente (→)" aria-label="Siguiente">▶</button>
+      </div>
+      <div class="fila-estado"><span id="progreso">—</span><label><input type="checkbox" id="narrar" checked> Narración</label></div>
+    </div>
     <ol id="log"><li>Arrastra para girar la vista, rueda para acercar.</li></ol>
   </div>
   <div id="vrslot"></div>

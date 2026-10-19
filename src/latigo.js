@@ -1,4 +1,4 @@
-// El látigo del visitante.
+// El látigo del visitante. Es un easter egg: arranca DESACTIVADO y se activa con el comando /latigo (ver main.js).
 //  - Compu (primera persona): aparece en la mano derecha; click izquierdo = chasquido.
 //  - VR: va en el control; botón de agarre (squeeze) = chasquido.
 // alReventar(puntos) recibe la cuerda en coordenadas del mundo justo cuando la punta revienta (para saber a quién le pegó).
@@ -88,9 +88,11 @@ export function crearLatigo({ renderer, camera, alReventar }) {
   let t = FIN;                 // tiempo desde el último chasquido (FIN = en reposo)
   let reventado = true;
   let controlVR = null;        // el control que sostiene el látigo en VR
+  let habilitado = false;      // easter egg: apagado hasta que alguien escriba /latigo
 
   function chasquear(control) {
     if (control) controlVR = control;
+    if (!habilitado) return;
     if (t < T2 + N * RETRASO) return;   // no interrumpir un latigazo a medio camino
     prepararAudio();
     t = 0; reventado = false;
@@ -104,7 +106,8 @@ export function crearLatigo({ renderer, camera, alReventar }) {
   // Coloca el grupo en la mano según el modo actual
   function ubicar() {
     let padre = null;
-    if (renderer.xr.isPresenting) padre = controlVR;
+    if (!habilitado) padre = null;
+    else if (renderer.xr.isPresenting) padre = controlVR;
     else if (document.pointerLockElement === renderer.domElement) padre = camera;
     if (padre !== grupo.parent) {
       if (grupo.parent) grupo.parent.remove(grupo);
@@ -178,5 +181,6 @@ export function crearLatigo({ renderer, camera, alReventar }) {
     calcularCuerda();   // siempre: aunque esté quieta, la mano se mueve y el piso la dobla distinto
   }
 
-  return { actualizar, chasquear, usarControl: c => { controlVR = c; } };
+  function activar(valor) { habilitado = valor; return habilitado; }
+  return { actualizar, chasquear, activar, activo: () => habilitado, usarControl: c => { controlVR = c; } };
 }

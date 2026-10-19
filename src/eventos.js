@@ -7,8 +7,10 @@
 //   { tipo:'pizarra',  titulo, tareas:[{nombre, quien, estado}] }
 //   { tipo:'entrega',  agente, a, item }
 //   { tipo:'presentar',agente, texto }
-//   { tipo:'diapositivas', agente, titulo, subtitulo, diapositivas:[{titulo, puntos, formula, nota}] }
-import { agentes, entregar, caminarA, ruta } from './agentes.js';
+//   { tipo:'diapositivas', agente, titulo, subtitulo, diapositivas:[{titulo, puntos, formula, nota, narracion}] }
+//   { tipo:'audio', agente, indice, url|null, duracion|null, texto }   indice 0 = portada; url null = usar la voz del navegador
+import { agentes, entregar, caminarA, ruta, reaccionar } from './agentes.js';
+import { registrarPista, olvidarPistas } from './voz.js';
 import { pantallas, dibujarPantalla, dibujarPizarra, mostrarDiapositivas } from './oficina.js';
 import { sleep } from './util.js';
 
@@ -16,11 +18,12 @@ export function crearBus(log) {
   return {
     async emitir(e) {
       const a = agentes[e.agente];
-      if ((e.agente && !a) || (e.a && !agentes[e.a])) { console.warn('Evento para un agente que no está en la escena:', e); return; }
+      if (e.tipo !== 'audio' && ((e.agente && !a) || (e.a && !agentes[e.a]))) { console.warn('Evento para un agente que no está en la escena:', e); return; }
       switch (e.tipo) {
         case 'estado':
           a.etiqueta.dibujar(e.texto); log(a.nombre, e.texto);
           a.visorMat.emissiveIntensity = e.animo === 'idle' ? 0.4 : 1.1;
+          if (e.animo) reaccionar(e.agente, e.animo, e.pose);   // lenguaje corporal según el estado real
           if (pantallas[e.agente]) {
             const s = pantallas[e.agente];
             if (e.animo) s.animo = e.animo; if (e.titulo) s.titulo = e.titulo; dibujarPantalla(e.agente);
@@ -36,7 +39,11 @@ export function crearBus(log) {
           await entregar(e.agente, e.a, e.item);
           break;
         case 'diapositivas':
-          mostrarDiapositivas(e); log(a.nombre, `presenta "${e.titulo}"`);
+          olvidarPistas(); mostrarDiapositivas(e); log(a.nombre, `presenta "${e.titulo}"`);
+          break;
+        case 'audio':
+          registrarPista(e);
+          if (e.indice === 0) log(a ? a.nombre : 'Presentador', e.url ? 'ensayando mi discurso' : 'sin voz IA: usaré la del navegador');
           break;
         case 'presentar':
           a.etiqueta.dibujar(e.texto); log(a.nombre, e.texto);

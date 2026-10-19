@@ -58,3 +58,20 @@ gatillo apuntando al monitor (tercio izquierdo = atrás).
 El presentador usa Gemini gratis: saca una clave en https://aistudio.google.com/apikey y
 ponla en un archivo `.env` en la raíz (`GEMINI_API_KEY=...` para el Presentador; para el Investigador,
 `GEMINI_API_KEY_GUION=...` y `GEMINI_MODEL=...`, o usa la misma clave). Ese archivo está en `.gitignore`.
+
+## Claves (Gemini gratis) y voz
+
+Hacen falta **dos claves** en el `.env` de la raíz (copia `.env.example`): `GEMINI_API_KEY_GUION` (investigador, guion)
+y `GEMINI_API_KEY` (diapositivas). La voz usa un *pool*: todas las claves distintas que existan (`GEMINI_API_KEY_VOZ`, `GEMINI_API_KEY_VOZ2`, `GEMINI_API_KEY`, `GEMINI_API_KEY_GUION`) por todos los modelos de `GEMINI_TTS_MODELOS`, en paralelo; si una combinación da 429 se aparta un minuto y se usa otra.
+El panel muestra con ✓/✗ qué claves encontró el servidor (nunca muestra los valores).
+La narración la graba el agente `locutor` (en escena habla el Presentador, no hay personaje locutor) (WAV en `salidas/locutor/`, con la duración real). Si Gemini TTS falla,
+esa diapositiva se narra con la voz del navegador. Se reutiliza el audio ya grabado si el texto no cambió.
+
+Pruebas (sin red ni claves):
+
+```
+.venv\Scripts\python -m unittest discover -s agentes/tests
+.venv\Scripts\python -m unittest discover -s backend/tests
+```
+
+Para comprobar tus claves sin mostrarlas: `.venv\Scripts\python -m agentes.claves` (dice cuáles acepta Gemini y si ven sus modelos).

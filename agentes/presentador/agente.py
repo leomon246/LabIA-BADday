@@ -11,6 +11,8 @@ from pathlib import Path
 
 from google import genai
 from google.genai import errors, types
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 NOMBRE = "presentador"
@@ -25,16 +27,29 @@ SALIDAS = AQUI.parent.parent / "salidas" / NOMBRE
 
 # ---------- 1. Forma exacta que debe devolver Gemini ----------
 
+# Modelos 3D que la escena sabe dibujar (src/modelos.js). "ninguno" si ninguno ayuda a explicar la diapositiva.
+Visual = Literal["ninguno", "planeta", "atomo", "agujero_negro", "estrella", "adn", "onda",
+                 "engranaje", "grafico_barras", "molecula", "cristal"]
+
+
+# Temas de color/estilo de las diapositivas (src/oficina.js, TEMAS). La IA elige el que mejor va con el tema.
+TemaVisual = Literal["cosmos", "naturaleza", "calido", "neon", "papel", "oceano"]
+
+
 class Diapositiva(BaseModel):
     titulo: str = Field(description="Titulo corto de la diapositiva")
     puntos: list[str] = Field(description="2 a 4 ideas cortas, maximo 15 palabras cada una")
     formula: str = Field(description="Formula en texto plano con simbolos Unicode (a² + b² = c²). Vacio si no hay")
     nota: str = Field(description="Una frase de cierre o dato curioso. Vacio si no hay")
+    visual: Visual = Field(description="Modelo 3D que flota junto a la pantalla y ayuda a entender ESTA diapositiva. Elige el mas relacionado con el tema (planeta, atomo, agujero_negro, estrella, adn, onda, engranaje, grafico_barras, molecula, cristal) o ninguno")
+    narracion: str = Field(description="Lo que dira el presentador en voz alta sobre esta diapositiva: 2 a 4 frases naturales, 25 a 60 palabras, sin simbolos raros ni formulas (las formulas se dicen con palabras)")
 
 
 class Presentacion(BaseModel):
     titulo: str
     subtitulo: str
+    tema_visual: TemaVisual = Field(description="Estilo visual de TODA la presentacion segun el tema: cosmos (astronomia, fisica), naturaleza (biologia, ecologia, salud), calido (historia, cultura, personas, arte), neon (tecnologia, computacion, futuro), papel (literatura, filosofia, lenguaje, clasico), oceano (mar, agua, quimica, geografia)")
+    visual_portada: Visual = Field(description="Modelo 3D para la portada, el mas representativo del tema general (o ninguno)")
     diapositivas: list[Diapositiva]
 
 
@@ -53,6 +68,8 @@ Reglas de formato:
 - Nada de Markdown (sin asteriscos, sin #) y nada de LaTeX (sin $ ni barras invertidas).
 - Formulas en texto plano con Unicode: ², ³, √, ·, ×, ≤, π.
 - Frases cortas, como se escriben en una diapositiva, no parrafos.
+- Pon un "visual" distinto en diapositivas consecutivas cuando el tema lo permita; usa "ninguno" si ninguno encaja (no fuerces).
+- La narracion es distinta del texto visible: habla con naturalidad, conecta con la diapositiva anterior y no repite las vinetas palabra por palabra.
 """
 
 
@@ -118,6 +135,8 @@ def ejecutar(entrada: str, emitir=None) -> str:
     SALIDAS.mkdir(parents=True, exist_ok=True)
     salida = SALIDAS / nombre_archivo(presentacion.titulo)
     salida.write_text(armar_html(presentacion), encoding="utf-8")
+    # Los mismos datos en JSON: de aqui parte el locutor (voz) y se puede reconstruir sin volver a llamar a Gemini
+    salida.with_suffix(".json").write_text(presentacion.model_dump_json(indent=2), encoding="utf-8")
     # La escena VR muestra esto en el monitor grande del fondo
     avisar({"tipo": "diapositivas", "agente": NOMBRE, **presentacion.model_dump()})
     avisar({"tipo": "estado", "agente": NOMBRE, "animo": "ok",

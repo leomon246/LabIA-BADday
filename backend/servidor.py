@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,6 +28,7 @@ def cargar_env(ruta: Path) -> None:
         ln = ln.strip()
         if ln and not ln.startswith("#") and "=" in ln:
             k, v = ln.split("=", 1)
+            v = re.split(r"\s+#", v, maxsplit=1)[0]          # "VALOR   # comentario" -> "VALOR"
             os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 

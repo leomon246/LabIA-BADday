@@ -5,9 +5,10 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { agentes } from './agentes.js';
+import { SALA } from './navegacion.js';
 
 const ARRIBA = new THREE.Vector3(0, 1, 0);
-const LIMITES = { xMin: -7.5, xMax: 7.5, zMin: -5.5, zMax: 7.5 };   // dentro de las paredes
+const LIMITES = { xMin: SALA.x0, xMax: SALA.x1, zMin: SALA.z0, zMax: SALA.z1 };   // dentro de las paredes (ver navegacion.js)
 const ALTURA_OJOS = 1.6;
 const VEL_CAMINAR = 2.2, VEL_CORRER = 4.0;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

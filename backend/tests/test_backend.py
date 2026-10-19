@@ -98,6 +98,27 @@ class Adaptadores(unittest.TestCase):
         self.assertNotIn("CLAVE-SECRETA", req.full_url)
         self.assertEqual(req.get_header("X-goog-api-key"), "CLAVE-SECRETA")
 
+    def test_gemini_usa_modelo_de_respaldo_si_esta_saturado(self):
+        ok = respuesta_http({"candidates": [{"content": {"parts": [{"text": json.dumps(guion_ok())}]}}]})
+        saturado = urllib.error.HTTPError("u", 503, "x", {}, io.BytesIO(b"demanda alta"))
+        with mock.patch.object(urllib.request, "urlopen", side_effect=[saturado, ok]) as u:
+            out = llm.Gemini("k", "principal", respaldos=("respaldo",)).generar_json("s", "u", {})
+        self.assertEqual(out["titulo"], "Agujeros negros")
+        self.assertIn("models/respaldo:", u.call_args_list[1][0][0].full_url)
+
+    def test_gemini_usa_respaldo_si_el_modelo_no_responde_a_tiempo(self):
+        ok = respuesta_http({"candidates": [{"content": {"parts": [{"text": json.dumps(guion_ok())}]}}]})
+        with mock.patch.object(urllib.request, "urlopen", side_effect=[TimeoutError("timed out"), ok]):
+            out = llm.Gemini("k", "principal", respaldos=("respaldo",)).generar_json("s", "u", {})
+        self.assertEqual(out["estilo"], "claro")
+
+    def test_gemini_no_cambia_de_modelo_si_la_clave_es_mala(self):
+        malo = urllib.error.HTTPError("u", 403, "x", {}, io.BytesIO(b"x"))
+        with mock.patch.object(urllib.request, "urlopen", side_effect=[malo]) as u:
+            with self.assertRaises(ErrorConfiguracion):
+                llm.Gemini("k", "principal", respaldos=("respaldo",)).generar_json("s", "u", {})
+        self.assertEqual(u.call_count, 1)
+
     def test_gemini_sin_clave(self):
         with self.assertRaises(ErrorConfiguracion): llm.Gemini("", "m")
 

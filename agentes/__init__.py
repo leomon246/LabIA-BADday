@@ -16,6 +16,7 @@ Hoy nadie los escucha; después se mandarán por WebSocket a la escena.
 import importlib
 import os
 import pkgutil
+import re
 from pathlib import Path
 
 
@@ -29,6 +30,7 @@ def cargar_env():
         linea = linea.strip()
         if linea and not linea.startswith("#") and "=" in linea:
             clave, valor = linea.split("=", 1)
+            valor = re.split(r"\s+#", valor, maxsplit=1)[0]   # "VALOR   # comentario" -> "VALOR"
             os.environ.setdefault(clave.strip(), valor.strip().strip('"\''))
 
 
