@@ -1,18 +1,19 @@
 // Punto de entrada: escena, render, VR, controles y bucle principal.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { VISITANTE, obstaculosJugador, crearEscenario, construirSala, animarSala, crearEscritorio, crearPizarra, pantallas, dibujarPantalla, dibujarPizarra,
          pizarra, hayDiapositivas, cambiarDiapositiva, irADiapositiva, indiceActual, totalDiapositivas, textoNarracion,
          alCambiarDiapositiva, visualDe } from './oficina.js';
-import { agentes, crearAgente, actualizarAgentes, asustar, tocaAgente, fijarMirada, gesto, senalar } from './agentes.js';
+import { agentes, crearAgente, actualizarAgentes, fijarMirada, gesto, senalar, golpear } from './agentes.js';
 import { crearFigurantes, actualizarFigurantes, publico, aplaudir, produccionIniciar, produccionPrimerRelevo, produccionRevelar, produccionAbortar, produccionActiva } from './figurantes.js';
 import { crearHolograma } from './modelos.js';
 import { configurarVoz, hablar, detener as detenerVoz, pausarReanudar, actualizarVoz, hayVoz, fuenteDe } from './voz.js';
 import { crearBus, guionDemo } from './eventos.js';
 import { crearJugador } from './jugador.js';
-import { crearLatigo } from './latigo.js';
+import { crearFisica } from './fisica.js';
+import { cubos, soportes, fuentesSonido } from './oficina.js';
+import { crearSonido } from './sonido.js';
 
 const app = document.getElementById('app');
 
@@ -43,36 +44,46 @@ camera.position.copy(POSE_ORBITA); rig.add(camera);
 const orbita = new OrbitControls(camera, renderer.domElement);
 orbita.target.set(0, 1.3, -9.5);
 orbita.enableDamping = true; orbita.maxPolarAngle = Math.PI * 0.49;
-orbita.minDistance = 3; orbita.maxDistance = 24;// Botón "Enter VR" (solo aparece si el navegador soporta VR)
+orbita.minDistance = 3; orbita.maxDistance = 24;
+
+// Botón grande "Entrar al laboratorio" (solo si el visor soporta VR). Reemplaza al botoncito de three.js.
 if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(ok => {
   if (!ok) return;
-  const b = VRButton.createButton(renderer); b.style.position = 'static'; b.style.transform = 'none';
+  const b = document.createElement('button');
+  b.id = 'entrarVR'; b.className = 'primary'; b.textContent = 'Entrar al laboratorio';
+  b.addEventListener('click', async () => {
+    if (renderer.xr.isPresenting) return renderer.xr.getSession().end();
+    try {
+      const sesion = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers'] });
+      await renderer.xr.setSession(sesion);
+    } catch (err) { log('VR', 'No se pudo entrar: ' + err.message); }
+  });
+  renderer.xr.addEventListener('sessionstart', () => { b.textContent = 'Salir del laboratorio'; });
+  renderer.xr.addEventListener('sessionend', () => { b.textContent = 'Entrar al laboratorio'; });
   document.getElementById('vrslot').appendChild(b);
 }).catch(() => {});
 
-// --- el látigo: EASTER EGG, apagado por defecto. Se activa/desactiva escribiendo /latigo en el campo de la pregunta. ---
-// (click en primera persona, botón de agarre en VR). Si toca al presentador, pasa a la siguiente diapositiva.
-const REACCIONES = ['¡Uy! Siguiente…', '¡Sorpresa! Sigo', '¡Eh! Ya avanzo'];
-const latigo = crearLatigo({ renderer, camera, alReventar: puntos => {
-  if (!tocaAgente('presentador', puntos)) return;
-  asustar('presentador');
-  agentes.presentador.etiqueta.dibujar(hayDiapositivas() ? REACCIONES[Math.floor(Math.random() * REACCIONES.length)] : 'Aún no hay diapositivas');
-  cambiarDiapositiva(1);
-} });
 
 // --- controles del Quest: modelo 3D + rayo ---
 const fabrica = new XRControllerModelFactory();
+fabrica.path = '/vendor/perfiles';   // modelos de los controles desde la compu (el Quest puede no tener internet)
+const manos = [];   // { control, agarre, rayo } de cada control, para iluminar el cubo que se agarraría
 for (let i = 0; i < 2; i++) {
-  const control = renderer.xr.getController(i);
-  control.addEventListener('select', () => gatillo(control));   // gatillo: pasa diapositivas o lanza la tarea
-  control.addEventListener('squeezestart', () => latigo.chasquear(control));   // agarre = latigazo
-  control.addEventListener('connected', e => { if (e.data.handedness === 'right') latigo.usarControl(control); });
+  const control = renderer.xr.getController(i), agarre = renderer.xr.getControllerGrip(i);
+  // Gatillo: mantenerlo sobre un cubo (cerca o apuntándolo) lo sostiene; si no hay cubo, pasa diapositivas.
+  let cuboConGatillo = false;
+  control.addEventListener('selectstart', () => { cuboConGatillo = fisica.agarrar(agarre, control); });
+  control.addEventListener('select', () => { if (!cuboConGatillo) gatillo(control); });
+  control.addEventListener('selectend', () => { if (cuboConGatillo) fisica.soltar(agarre); cuboConGatillo = false; });
+  // Agarre: un cubo cerca de la mano (o al que apuntas: vuela a la mano). Al soltar, se lanza.
+  control.addEventListener('squeezestart', () => fisica.agarrar(agarre, control));
+  control.addEventListener('squeezeend', () => fisica.soltar(agarre));
   const rayo = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]),
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
   rayo.scale.z = 3; control.add(rayo);
+  manos.push({ control, agarre, rayo });
   rig.add(control);
-  const agarre = renderer.xr.getControllerGrip(i);
   agarre.add(fabrica.createControllerModel(agarre));
   rig.add(agarre);
 }
@@ -118,6 +129,18 @@ for (const e of EQUIPO) {
   const d = crearEscritorio(scene, e.id, e.x, e.z, e.tipo, e.color);
   crearAgente(scene, e.id, e.nombre, e.color, d.puesto, d.yaw);
 }
+// --- sonido: ambiente de laboratorio en 3D y música generada (arranca con el primer click o tecla) ---
+const sonido = crearSonido({ camera, scene, ...fuentesSonido, estaciones: EQUIPO, hablando: () => hayVoz() });
+addEventListener('pointerdown', () => sonido.iniciar());
+addEventListener('keydown', () => sonido.iniciar());
+renderer.xr.addEventListener('sessionstart', () => sonido.despertar());   // al entrar/salir de VR el Quest puede congelar el audio
+renderer.xr.addEventListener('sessionend', () => sonido.despertar());
+for (const [id, cual, icono, apagado] of [['sonAmbiente', 'ambiente', '🔊', '🔈'], ['sonMusica', 'musica', '🎵', '🎵']]) {
+  const b = document.getElementById(id), nombre = cual === 'ambiente' ? 'Ambiente' : 'Música';
+  const pintar = on => { b.textContent = `${on ? icono : apagado} ${nombre}${on ? '' : ' (apagada)'}`; b.setAttribute('aria-pressed', on); };
+  pintar(sonido.activo(cual));
+  b.addEventListener('click', () => pintar(sonido.alternar(cual)));
+}
 const ESCENARIO = { x: 2.9, z: -4.6 };   // junto a la pantalla grande
 crearEscenario(scene, ESCENARIO.x, ESCENARIO.z);
 crearAgente(scene, 'presentador', 'Presentador', 0xD9663B, new THREE.Vector3(ESCENARIO.x, 0, ESCENARIO.z), 0);
@@ -134,6 +157,44 @@ const jugador = crearJugador({
   obstaculos: obstaculosJugador,                   // círculos en el piso que no se pueden atravesar (mesas, tanques, racks…)
 });
 document.getElementById('caminar').addEventListener('click', () => jugador.caminar());
+
+// --- física de los cubos: se caen, rebotan, se apilan; el visitante y los agentes los empujan ---
+const enCuerpo = () => document.pointerLockElement === renderer.domElement || renderer.xr.isPresenting;
+const posCamara = new THREE.Vector3(), haciaDelante = new THREE.Vector3();
+const fisica = crearFisica({
+  cubos, soportes,
+  obstaculos: obstaculosJugador.filter(o => !soportes.some(s => s.x === o.x && s.z === o.z)),   // el botón sostiene, no empuja
+  empujadores: () => {
+    const lista = Object.values(agentes).map(a => ({ id: a.id, x: a.g.position.x, z: a.g.position.z, r: 0.35 }));
+    if (enCuerpo()) { camera.getWorldPosition(posCamara); lista.push({ x: posCamara.x, z: posCamara.z, r: 0.3 }); }
+    return lista;
+  },
+  // Un cubo le pegó a alguien: se tambalea y se gira enojado hacia el visitante (si anda en primera persona o en VR)
+  alGolpear: (id, vx, vz, rapidez) => golpear(id, vx, vz, rapidez, enCuerpo() ? camera.getWorldPosition(new THREE.Vector3()) : null),
+});
+// Ilumina el cubo que se agarraría si aprietas ahora (y en VR, el rayo se pone naranja)
+function iluminarCubos() {
+  const lista = [];
+  if (renderer.xr.isPresenting) for (const m of manos) {
+    const b = fisica.sosteniendo(m.agarre) ? null : fisica.buscar(m.agarre, m.control);
+    if (b) lista.push(b.c);
+    m.rayo.material.color.setHex(b ? 0xFF8A1E : 0xFFFFFF);
+  } else if (document.pointerLockElement === renderer.domElement && !fisica.sosteniendo(camera)) {
+    const c = fisica.buscarConCamara(camera);
+    if (c) lista.push(c);
+  }
+  fisica.resaltar(lista);
+}
+// Compu (primera persona): E agarra el cubo que miras (o lo suelta); click lo lanza
+addEventListener('keydown', e => {
+  if (e.code !== 'KeyE' || document.pointerLockElement !== renderer.domElement) return;
+  if (!fisica.soltar(camera)) fisica.agarrarConCamara(camera);
+});
+addEventListener('mouseup', e => {
+  if (e.button !== 0 || !fisica.sosteniendo(camera)) return;
+  camera.getWorldDirection(haciaDelante);
+  fisica.soltar(camera, haciaDelante.multiplyScalar(9).add(new THREE.Vector3(0, 1.5, 0)));
+});
 
 // --- panel HTML y bus ---
 const logEl = document.getElementById('log');
@@ -252,7 +313,25 @@ fuente.onopen = async () => {
     const c = document.createElement('span'), ok = cfg.claves[nombre];
     c.className = 'chip ' + (ok ? 'ok' : 'no'); c.textContent = etiqueta + (ok ? ' ✓' : ' ✗'); claves.append(c);
   }
+  // Presentaciones precargadas (presentaciones/): el plan B si fallan internet o Gemini
+  precargadas = await fetch('/api/presentaciones').then(r => r.json()).catch(() => []);
+  const caja = document.getElementById('listaPrecargadas'); caja.replaceChildren();
+  for (const p of precargadas) {
+    const b = document.createElement('button'); b.type = 'button';
+    b.textContent = p.titulo; b.title = `${p.diapositivas} diapositivas, ${p.con_voz} con voz IA · también: /${p.id}`;
+    b.addEventListener('click', () => mostrarPrecargada(p.id));
+    caja.append(b);
+  }
+  document.getElementById('precargadas').hidden = !precargadas.length;
 };
+let precargadas = [];
+async function mostrarPrecargada(id) {
+  pasos.forEach(li => { li.className = ''; });
+  try {
+    const r = await fetch('/api/precargada', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    if (!r.ok) log('Servidor', (await r.json()).error);
+  } catch { log('Servidor', 'no responde'); }
+}
 fuente.onmessage = m => { const e = JSON.parse(m.data); cola = cola.then(() => bus.emitir(e)).catch(console.error); };
 fuente.onerror = () => { servEl.textContent = 'Sin servidor de agentes: corre .venv\\Scripts\\python -m agentes.servidor'; preguntarBtn.disabled = true; };
 
@@ -262,9 +341,8 @@ formEl.addEventListener('submit', async ev => {
   if (!tema) return temaEl.focus();
   if (tema.startsWith('/')) {   // comandos ocultos (no se mandan al servidor)
     const cmd = tema.slice(1).trim().toLowerCase();
-    if (cmd === 'latigo' || cmd === 'látigo') {
-      log('Sistema', latigo.activar(!latigo.activo()) ? 'Easter egg: látigo activado (click en primera persona, agarre en VR). /latigo lo guarda' : 'Látigo guardado');
-    } else log('Sistema', `Comando desconocido: /${cmd}`);
+    if (precargadas.some(p => p.id === cmd)) mostrarPrecargada(cmd);   // /<id> = presentación precargada
+    else log('Sistema', `Comando desconocido: /${cmd}`);
     temaEl.value = ''; return;
   }
   pasos.forEach(li => { li.className = ''; }); paso(0, 'activo');
@@ -285,10 +363,12 @@ renderer.setAnimationLoop(() => {
   actualizarAgentes(dt);
   animarSala(reloj.elapsedTime);
   jugador.actualizar(dt);
-  latigo.actualizar(dt);
+  fisica.actualizar(dt);
+  iluminarCubos();
   holograma.actualizar(reloj.elapsedTime);
   actualizarFigurantes();
   actualizarVoz(reloj.elapsedTime);
+  sonido.actualizar();
   renderer.render(scene, camera);
 });
 addEventListener('resize', () => {

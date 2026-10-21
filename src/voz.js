@@ -3,6 +3,7 @@
 // Un único reproductor: al empezar otra pista, la anterior se corta (no se solapan).
 import { hablando } from './agentes.js';
 import { marcarNarrando } from './oficina.js';
+import { vigilarAudio } from './util.js';
 
 const pistas = new Map();            // indice -> { url, texto, duracion }
 const audio = new Audio();           // un solo elemento reutilizado
@@ -26,6 +27,7 @@ function prepararAnalizador() {   // se crea con la primera reproducción (los n
     muestras = new Uint8Array(analizador.fftSize);
     ganancia = ctxAudio.createGain();   // fundidos: sin ellos cada corte de audio suena como un clic
     ctxAudio.createMediaElementSource(audio).connect(ganancia); ganancia.connect(analizador); analizador.connect(ctxAudio.destination);
+    vigilarAudio(ctxAudio);   // en el Quest puede quedar congelado y mudo
   } catch { ctxAudio = analizador = ganancia = null; }
 }
 

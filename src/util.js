@@ -48,3 +48,17 @@ export function crearTag(texto, color) {
   s.scale.set(0.6, 0.18, 1); s.renderOrder = 11;
   return s;
 }
+
+// En el Quest, un AudioContext puede quedar "running" pero congelado (su reloj no avanza y no suena nada),
+// p. ej. al entrar o salir de VR. Este vigilante lo nota y lo despierta (suspender + reanudar). Devuelve despertar().
+export function vigilarAudio(ctx) {
+  const despertar = () => ctx.suspend().then(() => ctx.resume()).catch(() => {});
+  let t = performance.now(), reloj = ctx.currentTime;
+  setInterval(() => {
+    const ahora = performance.now(), real = (ahora - t) / 1000, avance = ctx.currentTime - reloj;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    else if (ctx.state === 'running' && real > 1 && avance < real * 0.3) despertar();
+    t = ahora; reloj = ctx.currentTime;
+  }, 1500);
+  return despertar;
+}

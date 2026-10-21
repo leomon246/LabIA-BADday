@@ -52,6 +52,13 @@ Para verlo en el laboratorio VR, en vez de `python -m http.server` corre (no los
 ```
 Abre http://localhost:8000, escribe qué quieres aprender y pulsa Preguntar: el Jefe se lo pasa al
 Investigador, que investiga (con el código de `backend/`) y le lleva sus notas al Presentador.
+También puedes preguntar desde la consola de la PC y verlo en los lentes:
+
+```
+.venv\Scripts\python -m agentes preguntar "por qué el cielo es azul"
+.venv\Scripts\python -m agentes preguntar          # modo continuo: pregunta> ...
+```
+
 Las diapositivas aparecen en el monitor grande del fondo: flechas ← → en la compu; en VR,
 gatillo apuntando al monitor (tercio izquierdo = atrás).
 

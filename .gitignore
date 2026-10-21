@@ -7,3 +7,4 @@ salidas/
 .env
 data/
 *.tmp
+vendor/

@@ -8,6 +8,10 @@ export const VISITANTE = new THREE.Vector3(0, 0, 5.2);   // donde aparece la per
 export const pantallas = {};
 // Círculos en el piso que el VISITANTE no puede atravesar (los personajes usan navegacion.js)
 export const obstaculosJugador = [];
+// Para la física (fisica.js): los cubos que se mueven y las superficies elevadas donde se apoyan {x, z, r, h}
+export const cubos = [], soportes = [];
+// Para el sonido 3D (sonido.js): de dónde sale el zumbido de los racks y las burbujas de los tanques
+export const fuentesSonido = { racks: [], tanques: [] };
 const bloquear = (x, z, rJugador, rNav = rJugador) => { obstaculosJugador.push({ x, z, r: rJugador }); registrarObstaculo(x, z, rNav); };
 
 // Dimensiones del lab: paredes en x = ±13, z = -6 (fondo, con la pantalla grande) y z = 11 (frente, detrás del visitante)
@@ -130,6 +134,8 @@ export function construirSala(scene) {
   crearBoton(scene, 0, 9.7, 9.2 - 1.15);
   crearCubo(scene, -6.5, 10.1, 0.4);
   crearCubo(scene, -11.6, 7.4, -0.2);
+  crearCubo(scene, 1.45, 3.6, 0.15);   // dos cubos en el piso cerca de donde aparece el visitante
+  crearCubo(scene, 2.15, 3.8, -0.2);
   letreroCamara(scene, 7.0, ZF + 0.02);
 
   // Equipos: tanques en las esquinas del fondo y racks en las del frente
@@ -179,13 +185,25 @@ function diafragma(r, color) {
 // Letrero del laboratorio en la pared del frente (estilo señalética de cámara de pruebas)
 function letreroFrente(scene) {
   const L = canvasTex(1024, 320), x = L.ctx;
-  x.fillStyle = '#ECEDE8'; x.fillRect(0, 0, 1024, 320);
-  x.drawImage(diafragma(110, '#1E2226'), 36, 46);
-  x.fillStyle = '#1E2226'; x.font = `600 82px ${FONT}`; x.fillText('Laboratorio de agentes', 290, 140);
-  x.fillStyle = '#5A6166'; x.font = `400 44px ${FONT}`; x.fillText('Be a Dragon · USFQ', 292, 210);
-  x.fillStyle = '#' + new THREE.Color(NARANJA).getHexString(); x.fillRect(292, 238, 220, 10);
-  x.fillStyle = '#' + new THREE.Color(AZUL).getHexString(); x.fillRect(520, 238, 220, 10);
-  L.t.needsUpdate = true;
+  const LOGO = 200, X = 40 + LOGO + 26, ANCHO = 1024 - X - 40;   // logo de 200 px a la izquierda; el texto, a su derecha
+  // Tamaño que cabe en ANCHO con la fuente que haya (en el Quest sin internet no carga la de Google y la otra es más ancha)
+  const ajustar = (texto, peso, max) => {
+    x.font = `${peso} ${max}px ${FONT}`;
+    return Math.min(max, Math.floor(max * ANCHO / x.measureText(texto).width));
+  };
+  const dibujar = () => {
+    x.fillStyle = '#ECEDE8'; x.fillRect(0, 0, 1024, 320);
+    x.drawImage(diafragma(120, '#1E2226'), 40, (320 - LOGO) / 2, LOGO, LOGO);   // diafragma(r) mide 2r: se escala al tamaño del logo
+    x.fillStyle = '#1E2226'; x.font = `600 ${ajustar('Laboratorio de agentes IA', 600, 84)}px ${FONT}`;
+    x.fillText('Laboratorio de agentes IA', X, 146);
+    x.fillStyle = '#5A6166'; x.font = `400 ${ajustar('Be a Dragon · USFQ', 400, 44)}px ${FONT}`;
+    x.fillText('Be a Dragon · USFQ', X + 2, 208);
+    x.fillStyle = '#' + new THREE.Color(NARANJA).getHexString(); x.fillRect(X + 2, 234, 220, 10);
+    x.fillStyle = '#' + new THREE.Color(AZUL).getHexString(); x.fillRect(X + 230, 234, 220, 10);
+    L.t.needsUpdate = true;
+  };
+  dibujar();
+  document.fonts?.ready.then(dibujar);   // redibujar cuando cargue la fuente
   const letrero = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.625), new THREE.MeshBasicMaterial({ map: L.t }));
   letrero.position.set(0, 3.95, ZT - 0.04); letrero.rotation.y = Math.PI; scene.add(letrero);
 }
@@ -257,7 +275,7 @@ function crearCubo(scene, x, z, ry = 0, y = 0) {
   }
   const cubo = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), texCubo);
   cubo.position.set(x, y + 0.3, z); cubo.rotation.y = ry; cubo.castShadow = cubo.receiveShadow = true; scene.add(cubo);
-  if (!y) bloquear(x, z, 0.5, 0.45);
+  cubos.push(cubo);   // ya no es obstáculo fijo: lo mueve fisica.js
   return cubo;
 }
 
@@ -268,6 +286,7 @@ function crearBoton(scene, x, z, xFin) {
   const disco = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.52, 0.06, 32), brillo(0xE0442C, 0.35)); disco.position.set(x, 0.13, z);
   base.receiveShadow = aro.receiveShadow = true; scene.add(base, aro, disco);
   crearCubo(scene, x, z, 0.25, 0.16);
+  soportes.push({ x, z, r: 0.62, h: 0.16 });   // el cubo se apoya sobre el disco
   bloquear(x, z, 0.85, 0.8);
   const n = Math.floor((xFin - x - 0.9) / 0.35), punto = new THREE.CircleGeometry(0.06, 12), mat = brillo(NARANJA, 1.0);
   const fila = new THREE.InstancedMesh(punto, mat, n), m = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)), uno = new THREE.Vector3(1, 1, 1);
@@ -301,9 +320,11 @@ function crearTanque(scene, x, z, color) {
   base.castShadow = tapa.castShadow = true;
   g.add(base, liq, cas, tapa, tubo); scene.add(g);
   bloquear(x, z, 0.5);
+  fuentesSonido.tanques.push({ x, z });
 }
 
 function crearRack(scene, x, z) {
+  fuentesSonido.racks.push({ x, z });
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = x > 0 ? -Math.PI / 2 : Math.PI / 2;   // el frente mira al centro
   const caja = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.0, 0.6), material(0x2B3236, 0.5));
   caja.position.y = 1.0; caja.castShadow = true; g.add(caja);
@@ -574,7 +595,7 @@ export const visualDe = i => !presentacion ? 'ninguno' : i === 0 ? presentacion.
 // Lo que se dice en voz alta en cada diapositiva (0 = portada); respaldo si no hay audio grabado
 export function textoNarracion(i) {
   if (!presentacion) return '';
-  if (i === 0) return `${presentacion.titulo}. ${presentacion.subtitulo}`;
+  if (i === 0) return presentacion.narracion_portada || `${presentacion.titulo}. ${presentacion.subtitulo}`;
   const d = presentacion.diapositivas[i - 1];
   return d ? ((d.narracion || '').trim() || d.puntos.join('. ')) : '';
 }
@@ -582,8 +603,29 @@ export function textoNarracion(i) {
 export const alCambiarDiapositiva = f => { alCambiar = f; };
 export function marcarNarrando(v) { if (narrando !== v) { narrando = v; if (presentacion) dibujarDiapositiva(); } }
 
-// p = { titulo, subtitulo, diapositivas:[{titulo, puntos, formula, nota, narracion}] }
-export function mostrarDiapositivas(p) { presentacion = p; actual = 0; dibujarDiapositiva(); alCambiar && alCambiar(0, 'nueva'); }
+// p = { titulo, subtitulo, imagen_portada?, diapositivas:[{titulo, puntos, formula, nota, narracion, imagen?}] }
+export function mostrarDiapositivas(p) {
+  presentacion = p; actual = 0;
+  [p.imagen_portada, ...p.diapositivas.map(d => d.imagen)].forEach(imagen);   // se precargan todas
+  dibujarDiapositiva(); alCambiar && alCambiar(0, 'nueva');
+}
+
+// Imágenes de las diapositivas (las traen las presentaciones precargadas): se cargan una vez y se redibuja al llegar
+const imagenes = new Map();
+function imagen(url) {
+  if (!url) return null;
+  let img = imagenes.get(url);
+  if (!img) { img = new Image(); img.onload = () => { if (presentacion) dibujarDiapositiva(); }; img.src = url; imagenes.set(url, img); }
+  return img.complete && img.naturalWidth ? img : null;
+}
+// La imagen ajustada (sin deformar) dentro de la caja, con esquinas redondeadas y borde del tema
+function cuadroImagen(x, T, url, bx, by, bw, bh) {
+  const img = imagen(url); if (!img) return;
+  const k = Math.min(bw / img.naturalWidth, bh / img.naturalHeight), w = img.naturalWidth * k, h = img.naturalHeight * k;
+  const ix = bx + (bw - w) / 2, iy = by + (bh - h) / 2;
+  x.save(); rr(x, ix, iy, w, h, 18); x.clip(); x.drawImage(img, ix, iy, w, h); x.restore();
+  x.strokeStyle = rgba(T.acento, 0.55); x.lineWidth = 2; rr(x, ix, iy, w, h, 18); x.stroke();
+}
 export function cambiarDiapositiva(paso) { return irADiapositiva(actual + paso); }
 export function irADiapositiva(i) {
   if (!presentacion) return false;
@@ -626,26 +668,27 @@ function dibujarDiapositiva() {
 }
 
 function portada(x, T) {
-  motivo(x, T, true);
+  const img = presentacion.imagen_portada, ancho = img ? 560 : 640;
+  if (img) cuadroImagen(x, T, img, 650, 120, 330, 360); else motivo(x, T, true);
   x.font = `600 18px ${FONT}`; const etiqueta = 'LABORATORIO DE AGENTES';
   x.strokeStyle = rgba(T.acento, 0.6); x.lineWidth = 1.5; rr(x, 56, 64, x.measureText(etiqueta).width + 36, 36, 18); x.stroke();
   x.fillStyle = T.acento; x.fillText(etiqueta, 74, 88);
   x.font = fuente(T, 600, 62, true);
-  const titulo = envolver(x, presentacion.titulo, 640).slice(0, 3);
+  const titulo = envolver(x, presentacion.titulo, ancho).slice(0, 3);
   let y = 230 - (titulo.length - 1) * 30;
   x.fillStyle = T.acento; x.fillRect(56, y - 70, 90, 6);
   x.fillStyle = T.tinta;
   for (const l of titulo) { x.fillText(l, 56, y); y += 70; }
   x.fillStyle = T.suave; x.font = `400 30px ${FONT}`;
-  for (const l of envolver(x, presentacion.subtitulo, 640).slice(0, 3)) { x.fillText(l, 56, y + 6); y += 40; }
+  for (const l of envolver(x, presentacion.subtitulo, ancho).slice(0, 3)) { x.fillText(l, 56, y + 6); y += 40; }
 }
 
 // Tres composiciones para las diapositivas de contenido, así no todas se ven igual:
 //  lista (viñetas numeradas), tarjetas (cuadrícula) y destacado (la idea principal en grande)
 function contenido(x, T, d) {
   const tieneFormula = !!(d.formula && d.formula.trim()), nota = d.nota && d.nota.trim() ? d.nota.trim() : '';
-  const variante = tieneFormula || nota || d.puntos.length < 2 ? 0 : (hash(presentacion.titulo) + actual) % 3;
-  motivo(x, T, false);
+  const variante = tieneFormula || nota || d.imagen || d.puntos.length < 2 ? 0 : (hash(presentacion.titulo) + actual) % 3;
+  if (!d.imagen) motivo(x, T, false);
   // franja lateral y número de diapositiva
   const g = x.createLinearGradient(0, 0, 0, 560); g.addColorStop(0, T.acento); g.addColorStop(1, rgba(T.acento, 0.15));
   x.fillStyle = g; x.fillRect(0, 0, 10, 560);
@@ -660,16 +703,17 @@ function contenido(x, T, d) {
   const yIni = y + 22;
   if (variante === 1) return tarjetas(x, T, d, yIni);
   if (variante === 2) return destacado(x, T, d, yIni);
-  lista(x, T, d, yIni, tieneFormula, nota);
+  if (d.imagen) cuadroImagen(x, T, d.imagen, 584, yIni - 4, 384, 500 - yIni);   // con imagen: texto a la izquierda, imagen a la derecha
+  lista(x, T, d, yIni, tieneFormula, nota, d.imagen ? 440 : 790);
 }
 
-function lista(x, T, d, yIni, tieneFormula, nota) {
+function lista(x, T, d, yIni, tieneFormula, nota, ancho = 790) {
   // espacio disponible para viñetas (la fórmula y la nota van aparte)
   const yTope = 500 - (nota ? 76 : 0) - (tieneFormula ? 96 : 0);
   let tam = 34, bloques = [];
   for (; tam >= 24; tam -= 2) {
     x.font = `400 ${tam}px ${FONT}`;
-    bloques = d.puntos.map(p => envolver(x, p, 790));
+    bloques = d.puntos.map(p => envolver(x, p, ancho));
     if (bloques.reduce((s, l) => s + l.length * (tam + 8) + 18, 0) <= yTope - yIni) break;
   }
   let yp = yIni + tam;
@@ -685,13 +729,13 @@ function lista(x, T, d, yIni, tieneFormula, nota) {
   const yBase = 500 - (nota ? 76 : 0);
   if (tieneFormula) {
     x.fillStyle = rgba(T.acento, 0.08); x.strokeStyle = rgba(T.acento, 0.55); x.lineWidth = 2;
-    rr(x, 112, yBase - 82, 800, 72, 16); x.fill(); x.stroke();
+    rr(x, 112, yBase - 82, ancho + 10, 72, 16); x.fill(); x.stroke();
     x.fillStyle = T.acento; x.font = 'italic 500 40px Georgia, serif'; x.textAlign = 'center';
-    x.fillText(d.formula, 512, yBase - 32, 760); x.textAlign = 'left';
+    x.fillText(d.formula, 117 + ancho / 2, yBase - 32, ancho - 30); x.textAlign = 'left';
   }
   if (nota) {
     x.font = `400 24px ${FONT}`;
-    const ls = envolver(x, nota, 840).slice(0, 2), y0 = 500 - ls.length * 30 + 10;
+    const ls = envolver(x, nota, ancho + 50).slice(0, 2), y0 = 500 - ls.length * 30 + 10;
     x.fillStyle = T.acento; x.fillRect(56, y0 - 22, 4, ls.length * 30);
     x.fillStyle = T.suave; ls.forEach((l, i) => x.fillText(l, 74, y0 + i * 30));
   }

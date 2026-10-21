@@ -55,14 +55,16 @@ export function crearAgente(scene, id, nombre, color, casa, yaw) {
   });
   const etiqueta = crearEtiqueta(nombre, color); etiqueta.sprite.position.y = 2.0;
   g.add(cuerpo, bata, hombros, cuello, gafete, ...piernas, cabezaG, ...brazos, etiqueta.sprite);
-  g.position.copy(casa); g.rotation.y = yaw; scene.add(g);
+  g.position.copy(casa); g.rotation.y = yaw; g.rotation.order = 'YXZ';   // YXZ: las inclinaciones (x, z) van en el marco del personaje
+  scene.add(g);
   agentes[id] = { id, nombre, color, g, cuerpo, cabezaG, brazos, piernas, boca, ojos, etiqueta, visorMat, casa: casa.clone(), yawCasa: yaw,
                   camino: [], mirarYaw: yaw, velocidad: 1.6, paso: 0, alLlegar: null, susto: 0,
                   // gestos
                   base: 'idle', temp: null, tempHasta: 0, llevando: false, habla: false, nivelVoz: 0,
                   fase: Math.random() * 6.28, miraA: null, miraHasta: 0, proxMirada: 4 + Math.random() * 8,
                   giroHasta: 0, giroPorHabla: false,
-                  saludoHasta: -99, insignias: {}, insigniaHasta: 0, insigniaActual: null, cabezaYaw: 0 };
+                  saludoHasta: -99, insignias: {}, insigniaHasta: 0, insigniaActual: null, cabezaYaw: 0,
+                  golpe: null, inmuneHasta: 0, molesto: null };
 }
 
 // --- movimiento ---
@@ -80,7 +82,7 @@ export function caminarA(ag, puntos, yawFinal) {
   });
 }
 
-// Brinco y temblor cuando le pegan con el látigo (easter egg)
+// Brinco y temblor (susto)
 const SUSTO = 0.6;
 export function asustar(id) { if (agentes[id]) agentes[id].susto = SUSTO; }
 
@@ -88,6 +90,42 @@ export function asustar(id) { if (agentes[id]) agentes[id].susto = SUSTO; }
 export function tocaAgente(id, puntos, r = 0.4) {
   const p = agentes[id]?.g.position;
   return !!p && puntos.some(q => q.y < 1.75 && Math.hypot(q.x - p.x, q.z - p.z) < r);
+}
+
+// --- golpe con un cubo: empujón, tambaleo y enojo ---
+const QUEJAS_GOLPE = ['¡Oye!', '¡Ay! ¿Quién fue?', '¡Cuidado con eso!', '¡Mi cabeza!', '¿En serio?', '¡Que estoy trabajando!', '¡Auch!'];
+const DUR_GOLPE = 0.9, DUR_ENOJO = 2.6;
+// (dx, dz) = hacia dónde iba el cubo; rapidez en m/s; mirarA = punto hacia donde se gira enojado (el visitante, si está)
+export function golpear(id, dx, dz, rapidez, mirarA = null) {
+  const a = agentes[id]; if (!a || reloj < a.inmuneHasta) return false;
+  const n = Math.hypot(dx, dz) || 1; dx /= n; dz /= n;
+  const f = Math.min(1, rapidez / 8), yaw = a.g.rotation.y, empuje = 0.7 + 1.8 * f;
+  a.golpe = {
+    t: 0, vx: dx * empuje, vz: dz * empuje, fuerza: 0.14 + 0.22 * f, enojado: false,
+    lx: dx * Math.cos(yaw) - dz * Math.sin(yaw),   // dirección del golpe vista desde el personaje (derecha / adelante)
+    lz: dx * Math.sin(yaw) + dz * Math.cos(yaw),
+    mira: mirarA ? { x: mirarA.x, z: mirarA.z } : { x: a.g.position.x - dx * 3, z: a.g.position.z - dz * 3 },
+  };
+  a.inmuneHasta = reloj + 1.0;
+  return true;
+}
+const golpeActivo = a => a.golpe && a.golpe.t < DUR_GOLPE;
+const molestoActivo = a => a.molesto && reloj < a.molesto.hasta;
+
+function actualizarGolpe(a, dt) {
+  const gp = a.golpe, p = a.g.position;
+  gp.t += dt;
+  const frena = Math.exp(-gp.t * 6);                         // el empujón se frena rápido
+  p.x += gp.vx * frena * dt; p.z += gp.vz * frena * dt;
+  const sube = Math.min(1, gp.t / 0.1), baja = Math.max(0, 1 - gp.t / DUR_GOLPE);
+  const tilt = gp.fuerza * sube * baja * (1 + 0.35 * Math.sin(gp.t * 26));   // se echa hacia atrás y se bambolea
+  a.g.rotation.x = gp.lz * tilt; a.g.rotation.z = -gp.lx * tilt;
+  if (!gp.enojado && gp.t > 0.32) {                          // se recupera… y se enoja
+    gp.enojado = true;
+    gesto(a.id, 'enojo', DUR_ENOJO, QUEJAS_GOLPE[Math.floor(Math.random() * QUEJAS_GOLPE.length)]);
+    a.molesto = { hasta: reloj + DUR_ENOJO, yaw: Math.atan2(gp.mira.x - p.x, gp.mira.z - p.z) };
+  }
+  if (gp.t >= DUR_GOLPE) { a.g.rotation.x = 0; a.g.rotation.z = 0; }
 }
 
 // --- gestos y reacciones ---
@@ -153,6 +191,8 @@ function poseDe(a, nombre, t, lado) {
       if (v === 2) return der ? { x: -1.55, z: -0.55 + Math.sin(t * 3) * 0.05, hop: 0 } : { x: -0.35, z: 0.25, hop: 0 };
       return { x: -0.5 + Math.sin(t * 4.5 + f) * 0.35, z: lado * (0.3 + Math.sin(t * 3 + f) * 0.12), hop: 0 };
     }
+    case 'enojo':   return lado > 0 ? { x: -2.55 + Math.sin(t * 17) * 0.2, z: 0.3, hop: Math.abs(Math.sin(t * 7)) * 0.025 }   // agita el puño
+                                    : { x: 0.35, z: -0.75, hop: 0 };                                                          // mano en la cintura
     case 'senalar': return lado > 0 ? { x: -1.45, z: 0.5, hop: 0 } : { x: 0, z: -0.08, hop: 0 };           // brazo hacia la pantalla
     default:        return { x: 0, z: lado * 0.08 + Math.sin(t * 1.6 + f) * 0.03, hop: 0 };                       // reposo: respira
   }
@@ -195,7 +235,8 @@ function actualizarGestos(a, dt, caminando) {
   else if (a.miraA && reloj < a.miraHasta && agentes[a.miraA]) objetivo = agentes[a.miraA].g.getWorldPosition(_p);   // a un compañero
   else if (pose === 'work') objetivo = null;
   let yaw = 0, pitch = pose === 'work' ? 0.22 + Math.sin(reloj * 0.9 + a.fase) * 0.05 : 0;
-  if (pose === 'alert') yaw = Math.sin(reloj * 14) * 0.45;                                                // niega con la cabeza
+  if (pose === 'alert') yaw = Math.sin(reloj * 14) * 0.45;
+  else if (pose === 'enojo') { yaw = Math.sin(reloj * 9) * 0.28; pitch = -0.12; }                     // niega, mentón arriba                                                // niega con la cabeza
   else if (objetivo && !caminando) {
     const mundo = Math.atan2(objetivo.x - a.g.position.x, objetivo.z - a.g.position.z);
     yaw = Math.max(-1.1, Math.min(1.1, lerpAngulo(a.g.rotation.y, mundo, 1) - a.g.rotation.y));
@@ -222,7 +263,7 @@ function actualizarGestos(a, dt, caminando) {
     if (reloj > a.giroHasta) a.mirarYaw = Math.atan2(j.x - a.g.position.x, j.z - a.g.position.z);
     a.giroPorHabla = true;
   } else if (a.giroPorHabla && !caminando) { a.mirarYaw = a.yawCasa; a.giroPorHabla = false; }
-  a.g.rotation.z = a.susto ? a.g.rotation.z : (pose === 'habla' ? Math.sin(reloj * 1.3 + a.fase) * 0.035 : 0);   // balanceo suave
+  if (!golpeActivo(a)) a.g.rotation.z = a.susto ? a.g.rotation.z : (pose === 'habla' ? Math.sin(reloj * 1.3 + a.fase) * 0.035 : 0);   // balanceo suave
 
   // visor: pulsa con la voz
   if (a.habla) a.visorMat.emissiveIntensity = 0.9 + a.nivelVoz * 1.6;
@@ -239,7 +280,10 @@ export function actualizarAgentes(dt) {
       a.g.rotation.z = Math.sin(f * 40) * 0.18 * k;
       if (!a.susto) { p.y = 0; a.g.rotation.z = 0; }
     }
-    if (a.camino.length) {
+    if (golpeActivo(a)) actualizarGolpe(a, dt);
+    const pausado = golpeActivo(a) || molestoActivo(a);   // tras un golpe se queda quieto y enojado un momento
+    if (pausado && molestoActivo(a)) a.g.rotation.y = lerpAngulo(a.g.rotation.y, a.molesto.yaw, Math.min(1, dt * 7));
+    if (a.camino.length && !pausado) {
       const t = a.camino[0], dx = t.x - p.x, dz = t.z - p.z, d = Math.hypot(dx, dz);
       if (d < 0.06) {
         p.x = t.x; p.z = t.z; a.camino.shift();
@@ -256,10 +300,10 @@ export function actualizarAgentes(dt) {
           if (e < 0.55 && e > 1e-3) { const k = (0.55 - e) * 0.5; p.x += ex / e * k; p.z += ez / e * k; }
         }
       }
-    } else if (a.mirarYaw !== null) {
+    } else if (a.mirarYaw !== null && !pausado) {
       a.g.rotation.y = lerpAngulo(a.g.rotation.y, a.mirarYaw, Math.min(1, dt * 6));
     }
-    actualizarGestos(a, dt, a.camino.length > 0);
+    actualizarGestos(a, dt, a.camino.length > 0 && !pausado);
   }
 }
 

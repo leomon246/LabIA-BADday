@@ -5,6 +5,7 @@ los eventos salen con agente='presentador' (AGENTE_ESCENA). Este módulo solo es
 
 Entrada: ruta del JSON que deja el presentador (salidas/presentador/<tema>.json).
 Salida: salidas/locutor/<tema>/s0.wav (portada), s1.wav ... y manifest.json. Devuelve la ruta del manifest.
+Con `carpeta` graba en otra carpeta del proyecto (las presentaciones precargadas: presentaciones/<id>/audio).
 
 Voz con Gemini TTS. La cuota gratuita de TTS es pequeña (unas pocas peticiones por minuto POR MODELO Y POR
 PROYECTO), así que se reparte la carga: un "pool" de fuentes = claves x modelos. Cada diapositiva va a la
@@ -35,7 +36,8 @@ from errores import ErrorConectividad, ErrorConfiguracion, ErrorLab, ErrorProvee
 NOMBRE = "locutor"
 AGENTE_ESCENA = "presentador"     # quien "habla" en la escena
 DESCRIPCION = "Graba la narración de cada diapositiva (Gemini TTS repartido entre varias claves y modelos)"
-SALIDAS = Path(__file__).parent.parent.parent / "salidas" / NOMBRE
+RAIZ = Path(__file__).parent.parent.parent
+SALIDAS = RAIZ / "salidas" / NOMBRE
 TASA = 24000                      # Gemini TTS devuelve PCM 16 bits, mono, 24 kHz
 MAX_CARACTERES = 1500
 MODELOS_TTS = "gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts,gemini-3.1-flash-tts-preview,gemini-2.5-flash-preview-tts"
@@ -198,14 +200,15 @@ def guardar_wav(pcm: bytes, ruta: Path) -> float:
 
 def narraciones(p: dict) -> list[str]:
     """Texto hablado por índice: 0 = portada, 1..n = diapositivas."""
-    textos = [f"{p.get('titulo', '')}. {p.get('subtitulo', '')}".strip(" .") + "."]
+    textos = [(p.get("narracion_portada") or "").strip() or f"{p.get('titulo', '')}. {p.get('subtitulo', '')}".strip(" .") + "."]
     for d in p.get("diapositivas", []):
         t = (d.get("narracion") or "").strip() or ". ".join(d.get("puntos", []))
         textos.append(t or d.get("titulo", ""))
     return [" ".join(t.split())[:MAX_CARACTERES] for t in textos]
 
 
-def ejecutar(entrada: str, emitir=None, proveedor: ProveedorVoz | None = None, trabajadores: int | None = None) -> str:
+def ejecutar(entrada: str, emitir=None, proveedor: ProveedorVoz | None = None, trabajadores: int | None = None,
+             carpeta: Path | None = None) -> str:
     avisar = emitir or (lambda evento: None)
 
     def estado(texto, animo="work"):   # el visitante ve al Presentador "ensayando su discurso"
@@ -214,7 +217,11 @@ def ejecutar(entrada: str, emitir=None, proveedor: ProveedorVoz | None = None, t
     origen = Path(entrada)
     datos = json.loads(origen.read_text(encoding="utf-8"))
     textos = narraciones(datos)
-    carpeta = SALIDAS / origen.stem
+    carpeta = Path(carpeta) if carpeta else SALIDAS / origen.stem
+    try:   # el servidor sirve la raíz del proyecto: la URL es la ruta relativa a ella
+        prefijo_url = "/" + carpeta.resolve().relative_to(RAIZ.resolve()).as_posix()
+    except ValueError:
+        prefijo_url = f"/salidas/{NOMBRE}/{carpeta.name}"
     carpeta.mkdir(parents=True, exist_ok=True)
     ruta_manifest = carpeta / "manifest.json"
     previo = json.loads(ruta_manifest.read_text(encoding="utf-8")) if ruta_manifest.exists() else {}
@@ -245,7 +252,7 @@ def ejecutar(entrada: str, emitir=None, proveedor: ProveedorVoz | None = None, t
         elif voz is not None and error_voz is None:
             try:
                 duracion = round(guardar_wav(voz.sintetizar(texto), archivo), 2)
-                url = f"/salidas/locutor/{origen.stem}/s{i}.wav"
+                url = f"{prefijo_url}/s{i}.wav"
             except ErrorLab as e:
                 error = {"categoria": e.categoria, "mensaje": str(e)}
                 if e.categoria in ("configuracion", "proveedor"):

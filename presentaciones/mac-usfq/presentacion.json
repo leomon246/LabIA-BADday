@@ -1,0 +1,118 @@
+{
+  "titulo": "¿Por qué estudiar MAC en la USFQ?",
+  "subtitulo": "Matemáticas Aplicadas y Computación: estadística, código e inteligencia artificial",
+  "narracion_portada": "Hola. Hoy les cuento por qué vale la pena estudiar Matemáticas Aplicadas y Computación en la Universidad San Francisco de Quito: una carrera donde la estadística, la programación y la inteligencia artificial se juntan para resolver problemas reales.",
+  "tema_visual": "neon",
+  "visual_portada": "atomo",
+  "imagen_portada": "img/portada.svg",
+  "diapositivas": [
+    {
+      "titulo": "¿Qué es MAC?",
+      "puntos": ["Ingeniería en Matemáticas Aplicadas y Computación", "Une matemáticas, estadística y programación", "Convierte datos en decisiones", "Nueve semestres de formación"],
+      "formula": "",
+      "nota": "",
+      "visual": "cristal",
+      "imagen": "img/que-es.svg",
+      "narracion": "Empecemos por lo básico. MAC significa Ingeniería en Matemáticas Aplicadas y Computación. Es la carrera donde las matemáticas salen de la pizarra: con estadística y programación las conviertes en herramientas para entender datos, predecir y tomar mejores decisiones. Son nueve semestres."
+    },
+    {
+      "titulo": "Los cimientos: matemática que se aplica",
+      "puntos": ["Cálculo diferencial, integral y vectorial", "Álgebra lineal: el idioma de los datos", "Ecuaciones diferenciales y análisis numérico"],
+      "formula": "A · x = b",
+      "nota": "",
+      "visual": "onda",
+      "imagen": "img/cimientos.svg",
+      "narracion": "Todo empieza con bases sólidas. Cálculo, álgebra lineal y ecuaciones diferenciales son el lenguaje con el que se describen los datos, el movimiento y el cambio. Y con análisis numérico aprendes a que la computadora resuelva esas ecuaciones cuando a mano sería imposible."
+    },
+    {
+      "titulo": "Estadística: decidir con datos",
+      "puntos": ["Probabilidades e inferencia estadística", "Procesos estocásticos: el azar en el tiempo", "Modelos gráficos probabilísticos"],
+      "formula": "z = (x̄ − μ) / (σ / √n)",
+      "nota": "",
+      "visual": "grafico_barras",
+      "imagen": "img/estadistica.svg",
+      "narracion": "La estadística es el corazón de la carrera. Aprendes probabilidades e inferencia para sacar conclusiones confiables a partir de una muestra, procesos estocásticos para modelar fenómenos que cambian al azar, como la bolsa o el tráfico, y modelos gráficos probabilísticos, la base de muchos sistemas inteligentes."
+    },
+    {
+      "titulo": "Programar desde el primer año",
+      "puntos": ["C++ desde el segundo semestre, luego C++ avanzado", "Estructuras de datos y algoritmos avanzados", "Teoría de la computación: qué se puede calcular"],
+      "formula": "",
+      "nota": "",
+      "visual": "engranaje",
+      "imagen": "img/codigo.svg",
+      "narracion": "Aquí no solo haces cuentas: programas. Desde el primer año aprendes C más más, un lenguaje rápido y exigente que te enseña cómo piensa la máquina. Luego vienen estructuras de datos, algoritmos avanzados y teoría de la computación, para escribir programas que resuelvan problemas grandes de forma eficiente."
+    },
+    {
+      "titulo": "Machine learning: que la máquina aprenda",
+      "puntos": ["Aprendizaje automático: modelos que aprenden de ejemplos", "Inteligencia artificial", "Fundamentos de ciencia de datos"],
+      "formula": "",
+      "nota": "",
+      "visual": "atomo",
+      "imagen": "img/machine-learning.svg",
+      "narracion": "Con esas bases llegas a lo más emocionante: el machine learning, o aprendizaje automático. En lugar de programar cada regla, le das ejemplos a la computadora y ella encuentra los patrones. Así se detecta fraude, se recomiendan películas o se predice la demanda. También estudias inteligencia artificial y ciencia de datos."
+    },
+    {
+      "titulo": "Redes neuronales, visión y lenguaje",
+      "puntos": ["Redes neuronales artificiales", "Visión por computadora: máquinas que ven", "Procesamiento de lenguaje natural: máquinas que leen"],
+      "formula": "",
+      "nota": "",
+      "visual": "molecula",
+      "imagen": "img/redes.svg",
+      "narracion": "Después llegan las redes neuronales, la tecnología detrás de la inteligencia artificial moderna. Con visión por computadora enseñas a una máquina a reconocer objetos en imágenes, y con procesamiento de lenguaje natural, a entender texto, como los asistentes que conversan contigo. Sí, como los agentes de este laboratorio."
+    },
+    {
+      "titulo": "Optimizar: encontrar la mejor decisión",
+      "puntos": ["Modelos de optimización con laboratorio", "Optimización avanzada al final de la carrera", "Rutas, horarios, inversiones… y entrenar modelos"],
+      "formula": "",
+      "nota": "",
+      "visual": "agujero_negro",
+      "imagen": "img/optimizacion.svg",
+      "narracion": "Otra superpotencia de un MAC es optimizar. ¿Cuál es la ruta más corta para repartir pedidos? ¿Cómo armar horarios sin choques? ¿Dónde invertir? Todo eso es optimización. Y entrenar una red neuronal también lo es: el algoritmo baja, paso a paso, hasta el punto de menor error, como en esta imagen."
+    },
+    {
+      "titulo": "Tu ruta en nueve semestres",
+      "puntos": ["Base: cálculo, álgebra y C++", "Mitad: probabilidad, inferencia y algoritmos", "Final: machine learning, visión, lenguaje y datos", "Cierre: práctica y proyecto integrador"],
+      "formula": "",
+      "nota": "",
+      "visual": "adn",
+      "imagen": "img/ruta.svg",
+      "narracion": "Así se ve el camino. Los primeros semestres construyen la base en matemáticas y programación. A mitad de carrera llegan la probabilidad, la inferencia y los algoritmos. Al final, el aprendizaje automático, la visión, el lenguaje y la ingeniería de datos. Y cierras con una práctica pre profesional y un proyecto integrador."
+    },
+    {
+      "titulo": "Salida laboral: ¿de qué trabajas?",
+      "puntos": ["Ciencia de datos e ingeniería de machine learning", "Análisis cuantitativo y de riesgo", "Desarrollo de software e ingeniería de datos", "Investigación y posgrados en el exterior"],
+      "formula": "",
+      "nota": "",
+      "visual": "planeta",
+      "imagen": "img/carreras.svg",
+      "narracion": "¿Y después? Un MAC tiene muchas puertas abiertas. Puedes trabajar como científico de datos o ingeniero de machine learning, como analista cuantitativo o de riesgo en finanzas, como desarrollador de software o ingeniero de datos. Y si te apasiona la ciencia, la investigación y los posgrados en el exterior son un camino natural."
+    },
+    {
+      "titulo": "Dónde se necesita un MAC",
+      "puntos": ["Banca, seguros y fintech", "Telecomunicaciones, comercio y logística", "Salud, energía y sector público", "Startups y empresas de tecnología"],
+      "formula": "",
+      "nota": "",
+      "visual": "grafico_barras",
+      "imagen": "img/sectores.svg",
+      "narracion": "Hoy casi todas las organizaciones tienen datos y necesitan a alguien que los entienda. Bancos y aseguradoras para medir riesgos, empresas de telecomunicaciones y comercio para conocer a sus clientes, hospitales, energía y el sector público para planificar mejor, y startups que construyen productos con inteligencia artificial. Y puedes hacerlo desde Ecuador para el mundo."
+    },
+    {
+      "titulo": "¿Por qué en la USFQ?",
+      "puntos": ["Malla al día: machine learning, visión y lenguaje", "Artes liberales: arte, humanidades y emprendimiento", "Inglés y al menos una materia en inglés", "Optativas en computación, economía e industrial"],
+      "formula": "",
+      "nota": "",
+      "visual": "estrella",
+      "imagen": "img/usfq.svg",
+      "narracion": "¿Y por qué en la San Francisco? Porque la malla está al día: incluye aprendizaje automático, redes neuronales, visión y lenguaje. Porque con las artes liberales también estudias arte, humanidades y emprendimiento, y eso te hace un profesional más completo. Además, mejoras tu inglés y eliges optativas en computación, economía o ingeniería industrial."
+    },
+    {
+      "titulo": "¿Te gustan los retos y los datos?",
+      "puntos": ["Si te gustan las matemáticas y la tecnología, MAC es para ti", "Aprendes a entender el presente y a anticipar el futuro"],
+      "formula": "",
+      "nota": "Más información: usfq.edu.ec · Ingeniería en Matemáticas Aplicadas y Computación",
+      "visual": "cristal",
+      "imagen": "",
+      "narracion": "Para cerrar: si te gustan las matemáticas, te da curiosidad cómo funciona la inteligencia artificial y quieres resolver problemas reales, MAC puede ser tu carrera. Los datos están en todas partes, y quien sabe entenderlos decide mejor. Gracias por acompañarnos en este laboratorio."
+    }
+  ]
+}

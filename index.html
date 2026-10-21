@@ -23,17 +23,20 @@
       <h1>Laboratorio de agentes</h1>
       <button id="plegar" class="icono" title="Ocultar o mostrar el panel (H)" aria-label="Ocultar panel">–</button>
     </header>
-    <p class="ayuda">Caminar: WASD + mouse, Shift corre, Esc sale. Flechas ← → pasan diapositivas, Espacio pausa la narración. En VR: stick izquierdo camina, derecho gira, gatillo apuntando al monitor grande pasa diapositivas.</p>
+    <p class="ayuda">Caminar: WASD + mouse, Shift corre, Esc sale. E agarra el cubo que miras (se ilumina) y click lo lanza. Flechas ← → pasan diapositivas, Espacio pausa la narración. En VR: stick izquierdo camina, derecho gira, gatillo apuntando al monitor grande pasa diapositivas; gatillo o agarre sobre un cubo iluminado = traerlo a tu mano (al soltar se lanza). Hay cubos en el piso frente a ti.</p>
     <div class="row">
       <button id="go">Lanzar tarea de prueba</button>
       <button id="caminar">Caminar</button>
       <button id="reset">Reiniciar</button>
+      <button id="sonAmbiente" aria-pressed="true">🔊 Ambiente</button>
+      <button id="sonMusica" aria-pressed="true">🎵 Música</button>
     </div>
     <form id="pregunta">
       <label for="tema">¿Sobre qué quieres aprender?</label>
       <div class="row"><input id="tema" maxlength="500" placeholder="¿Cómo funcionan los agujeros negros?" autocomplete="off"><button class="primary" id="preguntar" type="submit" disabled>Preguntar</button></div>
       <small id="servidor">Buscando servidor de agentes…</small>
       <div id="claves" class="chips" aria-label="Claves configuradas"></div>
+      <div id="precargadas" hidden><small>Presentaciones listas (sin internet):</small><div class="row" id="listaPrecargadas"></div></div>
     </form>
     <ol id="pasos" aria-label="Progreso">
       <li data-paso="0">Pregunta</li><li data-paso="1">Investiga</li><li data-paso="2">Diapositivas</li><li data-paso="3">Voz</li><li data-paso="4">Listo</li>
